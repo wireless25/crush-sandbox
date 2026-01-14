@@ -110,6 +110,9 @@ create_container() {
         "-w" "$workspace"
     )
 
+    # Configure npm cache to use persistent volume
+    docker_args+=("-e" "npm_config_cache=/workspace-cache/npm")
+
     # Add environment variables for Git config if available
     if [ -n "$git_name" ]; then
         docker_args+=("-e" "GIT_USER_NAME=${git_name}")

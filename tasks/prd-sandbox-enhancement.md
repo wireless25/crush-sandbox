@@ -29,11 +29,11 @@ Enhance the existing docker-sandbox-crush wrapper to automatically install and c
 **Description:** As a developer, I want npm to use the persistent cache volume so packages downloaded in one session are available in the next session.
 
 **Acceptance Criteria:**
-- [ ] npm cache directory is set to `/workspace-cache/npm` via npm config
-- [ ] npm config is set during container creation/startup
-- [ ] npm cache persists across container restarts
-- [ ] npm cache is shared across all npm installs in the workspace
-- [ ] Typecheck/lint passes
+- [x] npm cache directory is set to `/workspace-cache/npm` via npm config
+- [x] npm config is set during container creation/startup
+- [x] npm cache persists across container restarts
+- [x] npm cache is shared across all npm installs in the workspace
+- [x] Typecheck/lint passes
 
 ### US-003: Configure pnpm cache directory
 **Description:** As a developer, I want pnpm to use the persistent cache volume so packages are cached between sessions.
