@@ -25,14 +25,56 @@ validate_docker() {
     return 0
 }
 
+get_workspace_info() {
+    local workspace
+    workspace="$(pwd)"
+    echo "$workspace"
+}
+
+read_git_config() {
+    local gitconfig="$HOME/.gitconfig"
+    local user_name=""
+    local user_email=""
+
+    if [ -f "$gitconfig" ]; then
+        user_name="$(git config --file "$gitconfig" user.name 2>/dev/null || echo "")"
+        user_email="$(git config --file "$gitconfig" user.email 2>/dev/null || echo "")"
+    else
+        echo "Warning: ~/.gitconfig not found" >&2
+    fi
+
+    if [ -z "$user_name" ] && [ -z "$user_email" ]; then
+        echo "Warning: Git user.name and user.email not configured" >&2
+    fi
+
+    echo "$user_name|$user_email"
+}
+
 run_command() {
     # Validate Docker is available
     if ! validate_docker; then
         exit 1
     fi
 
-    # TODO: Implement full run logic (US-002 through US-006)
-    echo "Docker is available. Ready to run Crush CLI in sandbox."
+    # Get workspace info
+    local workspace
+    workspace="$(get_workspace_info)"
+    echo "Workspace: $workspace"
+
+    # Read Git config
+    local git_config
+    git_config="$(read_git_config)"
+    local git_name="${git_config%|*}"
+    local git_email="${git_config##*|}"
+
+    if [ -n "$git_name" ]; then
+        echo "Git user.name: $git_name"
+    fi
+    if [ -n "$git_email" ]; then
+        echo "Git user.email: $git_email"
+    fi
+
+    # TODO: Continue with US-003 through US-006
 }
 
 # Main script logic

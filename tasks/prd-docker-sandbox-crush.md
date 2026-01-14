@@ -17,21 +17,21 @@ Create a simple wrapper tool that allows running the Crush CLI agent in a Docker
 **Description:** As a developer, I want the tool to accept CLI arguments and check that Docker is available so it fails fast with a clear error message.
 
 **Acceptance Criteria:**
-- [ ] Tool accepts a single subcommand: `run`
-- [ ] Tool validates Docker daemon is running and accessible
-- [ ] Tool validates Docker CLI is installed
-- [ ] If Docker is not available, tool exits with clear error message
-- [ ] Typecheck/lint passes
+- [x] Tool accepts a single subcommand: `run`
+- [x] Tool validates Docker daemon is running and accessible
+- [x] Tool validates Docker CLI is installed
+- [x] If Docker is not available, tool exits with clear error message
+- [x] Typecheck/lint passes
 
 ### US-002: Get current working directory and Git config
 **Description:** As a developer, I want the tool to discover the current workspace path and Git user configuration so the container can be properly configured.
 
 **Acceptance Criteria:**
-- [ ] Tool retrieves current working directory absolute path
-- [ ] Tool attempts to read Git `user.name` from `~/.gitconfig`
-- [ ] Tool attempts to read Git `user.email` from `~/.gitconfig`
-- [ ] Missing Git config is not an error (optional, warn only)
-- [ ] Typecheck/lint passes
+- [x] Tool retrieves current working directory absolute path
+- [x] Tool attempts to read Git `user.name` from `~/.gitconfig`
+- [x] Tool attempts to read Git `user.email` from `~/.gitconfig`
+- [x] Missing Git config is not an error (optional, warn only)
+- [x] Typecheck/lint passes
 
 ### US-003: Determine sandbox container name
 **Description:** As a developer, I want a predictable container name based on the workspace directory so containers can be reused per workspace.
