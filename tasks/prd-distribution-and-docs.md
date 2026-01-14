@@ -116,7 +116,7 @@ Make the docker-sandbox-crush tool easily installable without manual copy-pastin
 
 ## Technical Considerations
 
-- Remote URL: `https://raw.githubusercontent.com/[username]/docker-sandbox-crush/main/docker-sandbox-crush`
+- Remote URL: `https://raw.githubusercontent.com/wireless25/crush-sandbox/refs/heads/main/docker-sandbox-crush`
 - Installation command: `curl -fsSL <url> -o /usr/local/bin/docker-sandbox-crush && chmod +x /usr/local/bin/docker-sandbox-crush`
 - Update command: download to temp file, verify, then move to replace
 - Version stored as variable at top of script
