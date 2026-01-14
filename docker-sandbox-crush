@@ -3,7 +3,7 @@
 set -e
 
 print_usage() {
-    echo "Usage: docker-sandbox-crush <command>"
+    echo "Usage: docker-sandbox-crush <command> [options]"
     echo ""
     echo "Commands:"
     echo "  run     Run Crush CLI in Docker sandbox"
@@ -11,6 +11,7 @@ print_usage() {
     echo ""
     echo "Options:"
     echo "  --force  Skip confirmation for clean command"
+    echo "  --shell  Start interactive shell instead of Crush CLI (for debugging)"
 }
 
 validate_docker() {
@@ -164,6 +165,7 @@ EOF
 
 run_container() {
     local container_name="$1"
+    local shell_mode="$2"
 
     # Start the container (or restart if it was stopped)
     echo "Starting container..."
@@ -200,16 +202,29 @@ run_container() {
     # Configure pnpm cache directory (if pnpm is installed)
     docker exec "$container_name" sh -c "if command -v pnpm &> /dev/null; then pnpm config set cache-dir /workspace-cache/pnpm/cache 2>/dev/null || true; fi" > /dev/null 2>&1
 
-    # Execute an interactive shell in the container
-    # This allows the user to run Crush CLI commands
-    echo "Starting interactive shell in sandbox..."
-    if [ -t 0 ]; then
-        # Interactive mode with TTY
-        docker exec -it "$container_name" /bin/sh
+    # Execute command in container
+    if [ "$shell_mode" = "true" ]; then
+        # Execute an interactive shell in the container (for debugging)
+        echo "Starting interactive shell in sandbox..."
+        if [ -t 0 ]; then
+            # Interactive mode with TTY
+            docker exec -it "$container_name" /bin/sh
+        else
+            # Non-interactive mode (for testing)
+            echo "Warning: Not running in TTY mode, starting shell anyway..."
+            docker exec -i "$container_name" /bin/sh
+        fi
     else
-        # Non-interactive mode (for testing)
-        echo "Warning: Not running in TTY mode, starting shell anyway..."
-        docker exec -i "$container_name" /bin/sh
+        # Execute Crush CLI
+        echo "Starting Crush CLI..."
+        if [ -t 0 ]; then
+            # Interactive mode with TTY
+            docker exec -it "$container_name" crush
+        else
+            # Non-interactive mode (for testing)
+            echo "Warning: Not running in TTY mode, starting Crush CLI anyway..."
+            docker exec -i "$container_name" crush
+        fi
     fi
 
     # Stop the container after the session ends (but don't remove it)
@@ -264,7 +279,7 @@ run_command() {
     fi
 
     # Run the container
-    run_container "$container_name"
+    run_container "$container_name" "$SHELL_MODE"
 }
 
 clean_command() {
@@ -320,10 +335,13 @@ fi
 # Parse arguments
 COMMAND=""
 FORCE="false"
+SHELL_MODE="false"
 
 for arg in "$@"; do
     if [ "$arg" = "--force" ]; then
         FORCE="true"
+    elif [ "$arg" = "--shell" ]; then
+        SHELL_MODE="true"
     elif [ -z "$COMMAND" ]; then
         COMMAND="$arg"
     fi

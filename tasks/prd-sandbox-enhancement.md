@@ -90,31 +90,31 @@ Enhance the existing docker-sandbox-crush wrapper to automatically install and c
 **Description:** As a developer, I want the cache volume to be mounted in the container when it's created so all package manager operations use the persistent cache.
 
 **Acceptance Criteria:**
-- [ ] Container creation includes volume mount for workspace cache
-- [ ] Cache volume is mounted at `/workspace-cache`
-- [ ] Volume mount is added to existing `docker create` arguments
-- [ ] Cache volume is created if it doesn't exist
-- [ ] Typecheck/lint passes
+- [x] Container creation includes volume mount for workspace cache
+- [x] Cache volume is mounted at `/workspace-cache`
+- [x] Volume mount is added to existing `docker create` arguments
+- [x] Cache volume is created if it doesn't exist
+- [x] Typecheck/lint passes
 
 ### US-009: Run Crush CLI by default instead of interactive shell
 **Description:** As a developer, I want Crush CLI to start automatically when I run the sandbox so I don't have to manually invoke it every time.
 
 **Acceptance Criteria:**
-- [ ] Container startup executes Crush CLI instead of `/bin/sh`
-- [ ] Crush CLI is launched with appropriate flags for interactive use
-- [ ] If Crush CLI is not installed, error message directs user to check logs
-- [ ] Container exits when Crush CLI exits
-- [ ] Fallback to shell option available via `--shell` flag for debugging
-- [ ] Typecheck/lint passes
+- [x] Container startup executes Crush CLI instead of `/bin/sh`
+- [x] Crush CLI is launched with appropriate flags for interactive use
+- [x] If Crush CLI is not installed, error message directs user to check logs
+- [x] Container exits when Crush CLI exits
+- [x] Fallback to shell option available via `--shell` flag for debugging
+- [x] Typecheck/lint passes
 
 ### US-010: Add `--shell` flag for debugging
 **Description:** As a developer, I want to be able to get an interactive shell instead of running Crush CLI so I can debug setup issues or run manual commands.
 
 **Acceptance Criteria:**
-- [ ] Tool accepts `--shell` flag with `run` command
-- [ ] When `--shell` is set, container starts with `/bin/sh` instead of Crush CLI
-- [ ] `--shell` flag is documented in help output
-- [ ] Typecheck/lint passes
+- [x] Tool accepts `--shell` flag with `run` command
+- [x] When `--shell` is set, container starts with `/bin/sh` instead of Crush CLI
+- [x] `--shell` flag is documented in help output
+- [x] Typecheck/lint passes
 
 ### US-011: Clean command should also remove cache volume
 **Description:** As a developer, I want the `clean` command to remove the cache volume so I can completely reset the sandbox environment including caches.
