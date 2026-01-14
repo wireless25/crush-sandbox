@@ -89,10 +89,36 @@ create_container() {
     fi
 
     docker_args+=("$base_image")
-    docker_args+=("/bin/sh")
+    # Use tail -f /dev/null to keep container running
+    docker_args+=("tail" "-f" "/dev/null")
 
     echo "Creating container from image: ${base_image}"
     docker create "${docker_args[@]}"
+}
+
+run_container() {
+    local container_name="$1"
+
+    # Start the container (or restart if it was stopped)
+    echo "Starting container..."
+    docker start "$container_name" > /dev/null
+
+    # Execute an interactive shell in the container
+    # This allows the user to run Crush CLI commands
+    echo "Starting interactive shell in sandbox..."
+    if [ -t 0 ]; then
+        # Interactive mode with TTY
+        docker exec -it "$container_name" /bin/sh
+    else
+        # Non-interactive mode (for testing)
+        echo "Warning: Not running in TTY mode, starting shell anyway..."
+        docker exec -i "$container_name" /bin/sh
+    fi
+
+    # Stop the container after the session ends (but don't remove it)
+    echo "Stopping container..."
+    docker stop "$container_name" > /dev/null
+    echo "Container stopped"
 }
 
 run_command() {
@@ -132,7 +158,8 @@ run_command() {
         create_container "$workspace" "$container_name" "$git_name" "$git_email"
     fi
 
-    # TODO: Continue with US-006
+    # Run the container
+    run_container "$container_name"
 }
 
 # Main script logic

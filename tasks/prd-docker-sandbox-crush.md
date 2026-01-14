@@ -66,12 +66,12 @@ Create a simple wrapper tool that allows running the Crush CLI agent in a Docker
 **Description:** As a developer, I want the tool to start the sandbox container and execute the Crush CLI inside it.
 
 **Acceptance Criteria:**
-- [ ] Container is started (or restarted if it was stopped)
-- [ ] Crush CLI is executed inside the container with a default command (e.g., interactive shell)
-- [ ] Current working directory in container matches the mounted workspace path
-- [ ] Container attaches to current terminal/stdin/stdout/stderr
-- [ ] When Crush exits, container is stopped (but not removed for reuse)
-- [ ] Typecheck/lint passes
+- [x] Container is started (or restarted if it was stopped)
+- [x] Crush CLI is executed inside the container with a default command (e.g., interactive shell)
+- [x] Current working directory in container matches the mounted workspace path
+- [x] Container attaches to current terminal/stdin/stdout/stderr
+- [x] When Crush exits, container is stopped (but not removed for reuse)
+- [x] Typecheck/lint passes
 
 ### US-007: Handle container cleanup (optional command)
 **Description:** As a developer, I want to be able to remove the sandbox container to reset the environment.
