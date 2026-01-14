@@ -17,47 +17,55 @@ Make the docker-sandbox-crush tool easily installable without manual copy-pastin
 ### US-001: Install script remotely via curl
 **Description:** As a developer, I want to install the sandbox tool with a single command so I don't need to copy files into each project.
 
+**Status:** ✅ Complete
+
 **Acceptance Criteria:**
-- [ ] Script is available for download from a public URL (GitHub raw content)
-- [ ] Single curl command downloads and installs the script to /usr/local/bin or similar
-- [ ] Install command is documented in README
-- [ ] Installation sets executable permissions automatically
-- [ ] Installation validates Docker is available before completing
-- [ ] Typecheck/lint passes
+- [x] Script is available for download from a public URL (GitHub raw content)
+- [x] Single curl command downloads and installs the script to /usr/local/bin or similar
+- [x] Install command is documented in README
+- [x] Installation sets executable permissions automatically
+- [x] Installation validates Docker is available before completing
+- [x] Typecheck/lint passes
 
 ### US-002: Create comprehensive README documentation
 **Description:** As a new user, I want clear, friendly documentation that explains what the tool does and how to use it so I can quickly get started.
 
+**Status:** ✅ Complete
+
 **Acceptance Criteria:**
-- [ ] README has welcoming introduction explaining the tool's purpose
-- [ ] README includes quick start section with installation commands
-- [ ] README documents all commands (run, clean) and flags (--shell, --force)
-- [ ] README includes examples of common use cases
-- [ ] README explains the workspace isolation concept
-- [ ] README includes troubleshooting section
-- [ ] README has badges for status/license
-- [ ] README is written in friendly, open-source project tone
-- [ ] README is concise yet comprehensive
+- [x] README has welcoming introduction explaining the tool's purpose
+- [x] README includes quick start section with installation commands
+- [x] README documents all commands (run, clean) and flags (--shell, --force)
+- [x] README includes examples of common use cases
+- [x] README explains the workspace isolation concept
+- [x] README includes troubleshooting section
+- [x] README has badges for status/license
+- [x] README is written in friendly, open-source project tone
+- [x] README is concise yet comprehensive
 
 ### US-003: Publish code to public GitHub repository
 **Description:** As a maintainer, I want the code in a public GitHub repo so others can access, fork, and contribute to the project.
 
+**Status:** ✅ Complete
+
 **Acceptance Criteria:**
-- [ ] Repository is pushed to GitHub
-- [ ] Repository has proper .gitignore (ignoring local config files)
-- [ ] Repository includes LICENSE file (choose appropriate open-source license)
-- [ ] Repository includes README.md in root
-- [ ] Repository has clear repository name and description
-- [ ] Repository includes contribution guidelines or code of conduct
+- [x] Repository is pushed to GitHub
+- [x] Repository has proper .gitignore (ignoring local config files)
+- [x] Repository includes LICENSE file (choose appropriate open-source license)
+- [x] Repository includes README.md in root
+- [x] Repository has clear repository name and description
+- [x] Repository includes contribution guidelines or code of conduct
 
 ### US-004: Add version information to script
 **Description:** As a user, I want to see what version of the script I'm running so I can report issues and verify updates.
 
+**Status:** ✅ Complete
+
 **Acceptance Criteria:**
-- [ ] Script has a VERSION variable at the top
-- [ ] `--version` or `version` command displays current version
-- [ ] Version is updated in README when releasing
-- [ ] Typecheck/lint passes
+- [x] Script has a VERSION variable at the top
+- [x] `--version` or `version` command displays current version
+- [x] Version is updated in README when releasing
+- [x] Typecheck/lint passes
 
 ### US-005: Add update command
 **Description:** As a user, I want to update the script to the latest version without manual re-installation so I stay current with fixes and features.
