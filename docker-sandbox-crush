@@ -134,12 +134,49 @@ create_container() {
     docker create "${docker_args[@]}"
 }
 
+setup_crush_script() {
+    local container_name="$1"
+
+    # Create the setup script inside the container
+    docker exec "$container_name" sh -c 'cat > /usr/local/bin/setup-crush.sh << '\''EOF'\''
+#!/bin/sh
+
+# Check if Crush CLI is already installed
+if command -v crush &> /dev/null; then
+    exit 0
+fi
+
+# Install Crush CLI via npm global install
+echo "Installing Crush CLI..."
+if npm install -g @charmland/crush > /dev/null 2>&1; then
+    echo "Crush CLI installed successfully"
+    exit 0
+else
+    echo "Error: Failed to install Crush CLI"
+    exit 1
+fi
+EOF
+' > /dev/null 2>&1
+
+    # Make the script executable
+    docker exec "$container_name" chmod +x /usr/local/bin/setup-crush.sh > /dev/null 2>&1
+}
+
 run_container() {
     local container_name="$1"
 
     # Start the container (or restart if it was stopped)
     echo "Starting container..."
     docker start "$container_name" > /dev/null
+
+    # Setup Crush CLI script
+    setup_crush_script "$container_name"
+
+    # Run Crush CLI setup script
+    echo "Setting up Crush CLI..."
+    if ! docker exec "$container_name" /usr/local/bin/setup-crush.sh; then
+        echo "Warning: Failed to setup Crush CLI"
+    fi
 
     # Install pnpm if not already installed (uses npm cache)
     if ! docker exec "$container_name" sh -c "command -v pnpm &> /dev/null"; then

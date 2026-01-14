@@ -68,23 +68,23 @@ Enhance the existing docker-sandbox-crush wrapper to automatically install and c
 **Description:** As a developer, I want Crush CLI to be automatically installed in the sandbox with caching so it's available on first use without manual installation, but doesn't slow down subsequent startups.
 
 **Acceptance Criteria:**
-- [ ] Startup script is created inside container at `/usr/local/bin/setup-crush.sh`
-- [ ] Script checks if Crush CLI is already installed and skips if present
-- [ ] If not installed, script installs Crush CLI via `npm install -g @charmbracelet/crush-cli`
-- [ ] Crush CLI installation uses the npm cache for faster installs
-- [ ] Installation success/failure is logged with clear messages
-- [ ] Typecheck/lint passes
+- [x] Startup script is created inside container at `/usr/local/bin/setup-crush.sh`
+- [x] Script checks if Crush CLI is already installed and skips if present
+- [x] If not installed, script installs Crush CLI via `npm install -g @charmland/crush`
+- [x] Crush CLI installation uses the npm cache for faster installs
+- [x] Installation success/failure is logged with clear messages
+- [x] Typecheck/lint passes
 
 ### US-007: Execute Crush CLI setup script on container start
 **Description:** As a developer, I want the Crush CLI setup script to run automatically when the container starts so Crush CLI is always available without manual intervention.
 
 **Acceptance Criteria:**
-- [ ] Setup script is executed during container startup (before user gets shell)
-- [ ] Setup script runs silently on success (no noise in output)
-- [ ] Errors from setup script are displayed to user
-- [ ] User shell is only started after setup completes successfully
-- [ ] Setup is skipped if Crush CLI is already installed (fast path)
-- [ ] Typecheck/lint passes
+- [x] Setup script is executed during container startup (before user gets shell)
+- [x] Setup script runs silently on success (no noise in output)
+- [x] Errors from setup script are displayed to user
+- [x] User shell is only started after setup completes successfully
+- [x] Setup is skipped if Crush CLI is already installed (fast path)
+- [x] Typecheck/lint passes
 
 ### US-008: Update container creation to mount cache volume
 **Description:** As a developer, I want the cache volume to be mounted in the container when it's created so all package manager operations use the persistent cache.
