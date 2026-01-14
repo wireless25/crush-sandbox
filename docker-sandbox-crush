@@ -50,6 +50,15 @@ read_git_config() {
     echo "$user_name|$user_email"
 }
 
+get_container_name() {
+    local workspace="$1"
+    # Use md5 hash of workspace path for deterministic container name
+    # Prefix with 'crush-sandbox-' for readability
+    local hash
+    hash="$(echo -n "$workspace" | md5)"
+    echo "crush-sandbox-${hash}"
+}
+
 run_command() {
     # Validate Docker is available
     if ! validate_docker; then
@@ -60,6 +69,11 @@ run_command() {
     local workspace
     workspace="$(get_workspace_info)"
     echo "Workspace: $workspace"
+
+    # Get container name
+    local container_name
+    container_name="$(get_container_name "$workspace")"
+    echo "Container name: $container_name"
 
     # Read Git config
     local git_config
@@ -74,7 +88,7 @@ run_command() {
         echo "Git user.email: $git_email"
     fi
 
-    # TODO: Continue with US-003 through US-006
+    # TODO: Continue with US-004 through US-006
 }
 
 # Main script logic

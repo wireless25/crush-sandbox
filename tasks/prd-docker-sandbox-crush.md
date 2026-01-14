@@ -37,10 +37,10 @@ Create a simple wrapper tool that allows running the Crush CLI agent in a Docker
 **Description:** As a developer, I want a predictable container name based on the workspace directory so containers can be reused per workspace.
 
 **Acceptance Criteria:**
-- [ ] Container name is derived from workspace directory (e.g., hash or normalized path)
-- [ ] Same workspace always produces same container name
-- [ ] Container name is a valid Docker container name (no special characters)
-- [ ] Typecheck/lint passes
+- [x] Container name is derived from workspace directory (e.g., hash or normalized path)
+- [x] Same workspace always produces same container name
+- [x] Container name is a valid Docker container name (no special characters)
+- [x] Typecheck/lint passes
 
 ### US-004: Check if sandbox container already exists
 **Description:** As a developer, I want to check if a container already exists for this workspace to decide whether to reuse or create it.
