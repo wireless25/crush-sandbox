@@ -60,6 +60,41 @@ read_git_config() {
     echo "$user_name|$user_email"
 }
 
+get_host_crush_config_path() {
+    local config_path=""
+
+    # Check ~/.config/crush/ first
+    local config_dir_1="$HOME/.config/crush"
+    if [ -d "$config_dir_1" ]; then
+        if [ -r "$config_dir_1" ]; then
+            config_path="$config_dir_1"
+        else
+            echo "Error: Crush config directory exists but is not readable: $config_dir_1" >&2
+            exit 1
+        fi
+    fi
+
+    # If not found, check ~/.crush/
+    if [ -z "$config_path" ]; then
+        local config_dir_2="$HOME/.crush"
+        if [ -d "$config_dir_2" ]; then
+            if [ -r "$config_dir_2" ]; then
+                config_path="$config_dir_2"
+            else
+                echo "Error: Crush config directory exists but is not readable: $config_dir_2" >&2
+                exit 1
+            fi
+        fi
+    fi
+
+    # Log warning if no config directory found (but continue execution)
+    if [ -z "$config_path" ]; then
+        echo "Warning: No host Crush config directory found (checked ~/.config/crush/ and ~/.crush/)" >&2
+    fi
+
+    echo "$config_path"
+}
+
 get_container_name() {
     local workspace="$1"
     # Use md5 hash of workspace path for deterministic container name
