@@ -166,6 +166,7 @@ create_container() {
     local git_email="$4"
     local cache_volume_name="$5"
     local host_config_path="$6"
+    local worktree_config_path="$7"
 
     local base_image="node:18-alpine"
     local docker_args=(
@@ -178,6 +179,11 @@ create_container() {
     # Mount host Crush config read-only if available
     if [ -n "$host_config_path" ]; then
         docker_args+=("-v" "${host_config_path}:/host-crush-config:ro")
+    fi
+
+    # Mount worktree Crush config read-only if available
+    if [ -n "$worktree_config_path" ]; then
+        docker_args+=("-v" "${worktree_config_path}:/worktree-crush-config:ro")
     fi
 
     # Configure npm cache to use persistent volume
@@ -346,12 +352,19 @@ run_command() {
         echo "Host Crush config: $host_config_path"
     fi
 
+    # Get worktree Crush config path
+    local worktree_config_path
+    worktree_config_path="$(get_worktree_crush_config_path "$workspace")"
+    if [ -n "$worktree_config_path" ]; then
+        echo "Worktree Crush config: $worktree_config_path"
+    fi
+
     # Check if container exists, create if not
     if container_exists "$container_name"; then
         echo "Reusing existing container"
     else
         echo "Creating new container"
-        create_container "$workspace" "$container_name" "$git_name" "$git_email" "$cache_volume_name" "$host_config_path"
+        create_container "$workspace" "$container_name" "$git_name" "$git_email" "$cache_volume_name" "$host_config_path" "$worktree_config_path"
     fi
 
     # Run the container

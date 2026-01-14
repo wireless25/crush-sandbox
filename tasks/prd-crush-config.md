@@ -47,11 +47,11 @@ Users need to provide Crush CLI configuration to the Docker sandbox container se
 **Description:** As a developer, I need to mount the worktree's Crush configuration directory as read-only inside the container at a standard location.
 
 **Acceptance Criteria:**
-- [ ] Add Docker volume mount flag: `-v ${worktree_config_path}:/worktree-crush-config:ro`
-- [ ] Mount point `/worktree-crush-config` is consistent and predictable
-- [ ] Mount is read-only (`:ro` flag) to prevent container from modifying workspace files
-- [ ] Only add mount flag if worktree config directory exists and is readable
-- [ ] Test that files inside `/worktree-crush-config` are not writable from within container
+- [x] Add Docker volume mount flag: `-v ${worktree_config_path}:/worktree-crush-config:ro`
+- [x] Mount point `/worktree-crush-config` is consistent and predictable
+- [x] Mount is read-only (`:ro` flag) to prevent container from modifying workspace files
+- [x] Only add mount flag if worktree config directory exists and is readable
+- [x] Test that files inside `/worktree-crush-config` are not writable from within container
 
 ### US-005: Merge configuration from both sources with worktree precedence
 **Description:** As the Crush CLI container entry point, I need to merge configuration from host and worktree sources so worktree values override host values.
