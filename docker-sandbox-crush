@@ -165,6 +165,7 @@ create_container() {
     local git_name="$3"
     local git_email="$4"
     local cache_volume_name="$5"
+    local host_config_path="$6"
 
     local base_image="node:18-alpine"
     local docker_args=(
@@ -173,6 +174,11 @@ create_container() {
         "-v" "${cache_volume_name}:/workspace-cache"
         "-w" "$workspace"
     )
+
+    # Mount host Crush config read-only if available
+    if [ -n "$host_config_path" ]; then
+        docker_args+=("-v" "${host_config_path}:/host-crush-config:ro")
+    fi
 
     # Configure npm cache to use persistent volume
     docker_args+=("-e" "npm_config_cache=/workspace-cache/npm")
@@ -333,12 +339,19 @@ run_command() {
         echo "Git user.email: $git_email"
     fi
 
+    # Get host Crush config path
+    local host_config_path
+    host_config_path="$(get_host_crush_config_path)"
+    if [ -n "$host_config_path" ]; then
+        echo "Host Crush config: $host_config_path"
+    fi
+
     # Check if container exists, create if not
     if container_exists "$container_name"; then
         echo "Reusing existing container"
     else
         echo "Creating new container"
-        create_container "$workspace" "$container_name" "$git_name" "$git_email" "$cache_volume_name"
+        create_container "$workspace" "$container_name" "$git_name" "$git_email" "$cache_volume_name" "$host_config_path"
     fi
 
     # Run the container

@@ -37,11 +37,11 @@ Users need to provide Crush CLI configuration to the Docker sandbox container se
 **Description:** As a developer, I need to mount the host's Crush configuration directory as read-only inside the container at a standard location.
 
 **Acceptance Criteria:**
-- [ ] Add Docker volume mount flag: `-v ${host_config_path}:/host-crush-config:ro`
-- [ ] Mount point `/host-crush-config` is consistent and predictable
-- [ ] Mount is read-only (`:ro` flag) to prevent container from modifying host files
-- [ ] Only add mount flag if host config directory exists and is readable
-- [ ] Test that files inside `/host-crush-config` are not writable from within container
+- [x] Add Docker volume mount flag: `-v ${host_config_path}:/host-crush-config:ro`
+- [x] Mount point `/host-crush-config` is consistent and predictable
+- [x] Mount is read-only (`:ro` flag) to prevent container from modifying host files
+- [x] Only add mount flag if host config directory exists and is readable
+- [x] Test that files inside `/host-crush-config` are not writable from within container
 
 ### US-004: Mount worktree configuration read-only into container
 **Description:** As a developer, I need to mount the worktree's Crush configuration directory as read-only inside the container at a standard location.
