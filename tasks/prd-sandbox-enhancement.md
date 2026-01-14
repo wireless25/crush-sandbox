@@ -18,12 +18,12 @@ Enhance the existing docker-sandbox-crush wrapper to automatically install and c
 **Description:** As a developer, I want the sandbox to have a dedicated cache volume per workspace so my package manager caches persist between sessions and improve startup speed.
 
 **Acceptance Criteria:**
-- [ ] Tool creates a named Docker volume for each workspace on first run
-- [ ] Volume name follows pattern: `crush-cache-<workspace-hash>`
-- [ ] Volume is mounted in container at `/workspace-cache`
-- [ ] Cache volume persists even after container is stopped/removed
-- [ ] Volume is reused when container is recreated
-- [ ] Typecheck/lint passes
+- [x] Tool creates a named Docker volume for each workspace on first run
+- [x] Volume name follows pattern: `crush-cache-<workspace-hash>`
+- [x] Volume is mounted in container at `/workspace-cache`
+- [x] Cache volume persists even after container is stopped/removed
+- [x] Volume is reused when container is recreated
+- [x] Typecheck/lint passes
 
 ### US-002: Configure npm cache directory
 **Description:** As a developer, I want npm to use the persistent cache volume so packages downloaded in one session are available in the next session.
