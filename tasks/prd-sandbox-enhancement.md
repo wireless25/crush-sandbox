@@ -120,11 +120,11 @@ Enhance the existing docker-sandbox-crush wrapper to automatically install and c
 **Description:** As a developer, I want the `clean` command to remove the cache volume so I can completely reset the sandbox environment including caches.
 
 **Acceptance Criteria:**
-- [ ] `clean` command removes the cache volume for the current workspace
-- [ ] Cache volume removal happens after container removal
-- [ ] Clean command confirms cache volume removal (or requires --force)
-- [ ] Error if cache volume doesn't exist (non-fatal)
-- [ ] Typecheck/lint passes
+- [x] `clean` command removes the cache volume for the current workspace
+- [x] Cache volume removal happens after container removal
+- [x] Clean command confirms cache volume removal (or requires --force)
+- [x] Error if cache volume doesn't exist (non-fatal)
+- [x] Typecheck/lint passes
 
 ## Functional Requirements
 

@@ -298,32 +298,43 @@ clean_command() {
     local container_name
     container_name="$(get_container_name "$workspace")"
 
+    # Get cache volume name
+    local cache_volume_name
+    cache_volume_name="$(get_cache_volume_name "$workspace")"
+
     # Check if container exists
     if ! container_exists "$container_name"; then
         echo "No sandbox container found for workspace: $workspace"
-        exit 0
-    fi
+    else
+        echo "Found container: $container_name"
 
-    echo "Found container: $container_name"
-
-    # Confirm deletion unless --force flag is set
-    if [ "$force" != "true" ]; then
-        read -p "Are you sure you want to remove the container '$container_name'? [y/N] " confirm
-        if [[ ! "$confirm" =~ ^[yY] ]]; then
-            echo "Aborted"
-            exit 0
+        # Confirm deletion unless --force flag is set
+        if [ "$force" != "true" ]; then
+            read -p "Are you sure you want to remove the container '$container_name'? [y/N] " confirm
+            if [[ ! "$confirm" =~ ^[yY] ]]; then
+                echo "Aborted"
+                exit 0
+            fi
         fi
+
+        # Stop the container if it's running
+        echo "Stopping container..."
+        docker stop "$container_name" > /dev/null 2>&1 || true
+
+        # Remove the container
+        echo "Removing container..."
+        docker rm "$container_name" > /dev/null 2>&1 || true
+
+        echo "Container removed: $container_name"
     fi
 
-    # Stop the container if it's running
-    echo "Stopping container..."
-    docker stop "$container_name" > /dev/null 2>&1 || true
-
-    # Remove the container
-    echo "Removing container..."
-    docker rm "$container_name" > /dev/null 2>&1 || true
-
-    echo "Container removed: $container_name"
+    # Remove cache volume
+    echo "Removing cache volume..."
+    if docker volume rm "$cache_volume_name" > /dev/null 2>&1; then
+        echo "Cache volume removed: $cache_volume_name"
+    else
+        echo "Cache volume not found: $cache_volume_name"
+    fi
 }
 
 # Main script logic
