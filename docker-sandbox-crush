@@ -385,6 +385,7 @@ install_command() {
     echo "You can now run:"
     echo "  docker-sandbox-crush run      # Start Crush CLI in sandbox"
     echo "  docker-sandbox-crush clean    # Remove sandbox for current workspace"
+    echo "  docker-sandbox-crush update   # Update to latest version"
     echo ""
     echo "For more information, run:"
     echo "  docker-sandbox-crush --help"

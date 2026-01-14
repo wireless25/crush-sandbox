@@ -101,6 +101,19 @@ docker-sandbox-crush clean --force
 docker-sandbox-crush --version
 ```
 
+### Update to latest version
+
+```bash
+docker-sandbox-crush update
+```
+
+This will:
+- Check for the latest version on GitHub
+- Compare with your current version
+- Prompt for confirmation if a newer version is available
+- Download and replace the script automatically
+- Validate the downloaded script before installing
+
 ### Get help
 
 ```bash
