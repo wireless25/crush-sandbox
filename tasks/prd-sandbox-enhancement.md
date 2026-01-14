@@ -39,20 +39,20 @@ Enhance the existing docker-sandbox-crush wrapper to automatically install and c
 **Description:** As a developer, I want pnpm to use the persistent cache volume so packages are cached between sessions.
 
 **Acceptance Criteria:**
-- [ ] pnpm cache directory is set to `/workspace-cache/pnpm` via pnpm config
-- [ ] pnpm config is set during container creation/startup
-- [ ] pnpm cache persists across container restarts
-- [ ] pnpm cache is shared across all pnpm installs in the workspace
-- [ ] Typecheck/lint passes
+- [x] pnpm cache directory is set to `/workspace-cache/pnpm` via pnpm config
+- [x] pnpm config is set during container creation/startup
+- [x] pnpm cache persists across container restarts
+- [x] pnpm cache is shared across all pnpm installs in the workspace
+- [x] Typecheck/lint passes
 
 ### US-004: Pre-install npm package manager
 **Description:** As a developer, I want npm to be available in the sandbox so I can install Node.js dependencies without any setup.
 
 **Acceptance Criteria:**
-- [ ] npm is pre-installed (comes with base node:18-alpine image)
-- [ ] npm is available in PATH from container startup
-- [ ] npm version is displayed on container start for verification
-- [ ] Typecheck/lint passes
+- [x] npm is pre-installed (comes with base node:18-alpine image)
+- [x] npm is available in PATH from container startup
+- [x] npm version is displayed on container start for verification
+- [x] Typecheck/lint passes
 
 ### US-005: Pre-install pnpm package manager
 **Description:** As a developer, I want pnpm to be available in the sandbox so I can use it as an alternative package manager without manual installation.
