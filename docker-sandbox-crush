@@ -63,6 +63,15 @@ get_container_name() {
     echo "crush-sandbox-${hash}"
 }
 
+get_cache_volume_name() {
+    local workspace="$1"
+    # Use md5 hash of workspace path for deterministic volume name
+    # Prefix with 'crush-cache-' for readability
+    local hash
+    hash="$(echo -n "$workspace" | md5)"
+    echo "crush-cache-${hash}"
+}
+
 container_exists() {
     local container_name="$1"
     # Use docker ps -a to check if container exists (including stopped containers)
@@ -71,16 +80,33 @@ container_exists() {
     return $?
 }
 
+create_cache_volume() {
+    local cache_volume_name="$1"
+
+    # Check if volume already exists
+    if docker volume ls -q --filter "name=^${cache_volume_name}$" | grep -q "^${cache_volume_name}$"; then
+        echo "Using existing cache volume: $cache_volume_name"
+        return 0
+    fi
+
+    # Create the volume
+    echo "Creating cache volume: $cache_volume_name"
+    docker volume create "$cache_volume_name" > /dev/null
+    echo "Cache volume created: $cache_volume_name"
+}
+
 create_container() {
     local workspace="$1"
     local container_name="$2"
     local git_name="$3"
     local git_email="$4"
+    local cache_volume_name="$5"
 
     local base_image="node:18-alpine"
     local docker_args=(
         "--name" "$container_name"
         "-v" "${workspace}:${workspace}"
+        "-v" "${cache_volume_name}:/workspace-cache"
         "-w" "$workspace"
     )
 
@@ -141,6 +167,14 @@ run_command() {
     container_name="$(get_container_name "$workspace")"
     echo "Container name: $container_name"
 
+    # Get cache volume name
+    local cache_volume_name
+    cache_volume_name="$(get_cache_volume_name "$workspace")"
+    echo "Cache volume: $cache_volume_name"
+
+    # Create cache volume if it doesn't exist
+    create_cache_volume "$cache_volume_name"
+
     # Read Git config
     local git_config
     git_config="$(read_git_config)"
@@ -159,7 +193,7 @@ run_command() {
         echo "Reusing existing container"
     else
         echo "Creating new container"
-        create_container "$workspace" "$container_name" "$git_name" "$git_email"
+        create_container "$workspace" "$container_name" "$git_name" "$git_email" "$cache_volume_name"
     fi
 
     # Run the container
