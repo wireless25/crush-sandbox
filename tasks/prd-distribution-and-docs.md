@@ -70,13 +70,15 @@ Make the docker-sandbox-crush tool easily installable without manual copy-pastin
 ### US-005: Add update command
 **Description:** As a user, I want to update the script to the latest version without manual re-installation so I stay current with fixes and features.
 
+**Status:** ✅ Complete
+
 **Acceptance Criteria:**
-- [ ] Script accepts `update` command
-- [ ] `update` command downloads latest version from remote URL
-- [ ] Update command replaces current script with new version
-- [ ] Update command displays version change information
-- [ ] Update command validates download before replacing
-- [ ] Typecheck/lint passes
+- [x] Script accepts `update` command
+- [x] `update` command downloads latest version from remote URL
+- [x] Update command replaces current script with new version
+- [x] Update command displays version change information
+- [x] Update command validates download before replacing
+- [x] Typecheck/lint passes
 
 ### US-006: Create GitHub release workflow (optional)
 **Description:** As a maintainer, I want to create GitHub releases automatically so users can easily track versions and changes.
