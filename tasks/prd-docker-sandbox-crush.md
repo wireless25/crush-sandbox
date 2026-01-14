@@ -77,11 +77,11 @@ Create a simple wrapper tool that allows running the Crush CLI agent in a Docker
 **Description:** As a developer, I want to be able to remove the sandbox container to reset the environment.
 
 **Acceptance Criteria:**
-- [ ] Tool accepts `clean` or `reset` subcommand
-- [ ] Stops the sandbox container if running
-- [ ] Removes the sandbox container
-- [ ] Confirm before deletion or require `--force` flag
-- [ ] Typecheck/lint passes
+- [x] Tool accepts `clean` or `reset` subcommand
+- [x] Stops the sandbox container if running
+- [x] Removes the sandbox container
+- [x] Confirm before deletion or require `--force` flag
+- [x] Typecheck/lint passes
 
 ## Functional Requirements
 

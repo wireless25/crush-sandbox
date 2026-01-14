@@ -6,7 +6,11 @@ print_usage() {
     echo "Usage: docker-sandbox-crush <command>"
     echo ""
     echo "Commands:"
-    echo "  run    Run Crush CLI in Docker sandbox"
+    echo "  run     Run Crush CLI in Docker sandbox"
+    echo "  clean   Remove the sandbox container for current workspace"
+    echo ""
+    echo "Options:"
+    echo "  --force  Skip confirmation for clean command"
 }
 
 validate_docker() {
@@ -162,17 +166,79 @@ run_command() {
     run_container "$container_name"
 }
 
+clean_command() {
+    local force="$1"
+
+    # Validate Docker is available
+    if ! validate_docker; then
+        exit 1
+    fi
+
+    # Get workspace info
+    local workspace
+    workspace="$(get_workspace_info)"
+
+    # Get container name
+    local container_name
+    container_name="$(get_container_name "$workspace")"
+
+    # Check if container exists
+    if ! container_exists "$container_name"; then
+        echo "No sandbox container found for workspace: $workspace"
+        exit 0
+    fi
+
+    echo "Found container: $container_name"
+
+    # Confirm deletion unless --force flag is set
+    if [ "$force" != "true" ]; then
+        read -p "Are you sure you want to remove the container '$container_name'? [y/N] " confirm
+        if [[ ! "$confirm" =~ ^[yY] ]]; then
+            echo "Aborted"
+            exit 0
+        fi
+    fi
+
+    # Stop the container if it's running
+    echo "Stopping container..."
+    docker stop "$container_name" > /dev/null 2>&1 || true
+
+    # Remove the container
+    echo "Removing container..."
+    docker rm "$container_name" > /dev/null 2>&1 || true
+
+    echo "Container removed: $container_name"
+}
+
 # Main script logic
 if [ $# -lt 1 ]; then
     print_usage >&2
     exit 1
 fi
 
-COMMAND="$1"
+# Parse arguments
+COMMAND=""
+FORCE="false"
+
+for arg in "$@"; do
+    if [ "$arg" = "--force" ]; then
+        FORCE="true"
+    elif [ -z "$COMMAND" ]; then
+        COMMAND="$arg"
+    fi
+done
+
+if [ -z "$COMMAND" ]; then
+    print_usage >&2
+    exit 1
+fi
 
 case "$COMMAND" in
     run)
         run_command
+        ;;
+    clean|reset)
+        clean_command "$FORCE"
         ;;
     *)
         echo "Error: Unknown command: $COMMAND" >&2
