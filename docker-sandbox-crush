@@ -59,6 +59,14 @@ get_container_name() {
     echo "crush-sandbox-${hash}"
 }
 
+container_exists() {
+    local container_name="$1"
+    # Use docker ps -a to check if container exists (including stopped containers)
+    # --filter name=... matches containers with the exact name
+    docker ps -a --filter "name=^${container_name}$" --format '{{.Names}}' | grep -q "^${container_name}$"
+    return $?
+}
+
 run_command() {
     # Validate Docker is available
     if ! validate_docker; then
@@ -75,6 +83,13 @@ run_command() {
     container_name="$(get_container_name "$workspace")"
     echo "Container name: $container_name"
 
+    # Check if container exists
+    if container_exists "$container_name"; then
+        echo "Container exists: yes"
+    else
+        echo "Container exists: no"
+    fi
+
     # Read Git config
     local git_config
     git_config="$(read_git_config)"
@@ -88,7 +103,7 @@ run_command() {
         echo "Git user.email: $git_email"
     fi
 
-    # TODO: Continue with US-004 through US-006
+    # TODO: Continue with US-005 through US-006
 }
 
 # Main script logic

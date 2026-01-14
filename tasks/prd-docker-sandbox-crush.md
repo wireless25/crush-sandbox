@@ -46,10 +46,10 @@ Create a simple wrapper tool that allows running the Crush CLI agent in a Docker
 **Description:** As a developer, I want to check if a container already exists for this workspace to decide whether to reuse or create it.
 
 **Acceptance Criteria:**
-- [ ] Tool queries Docker to check if container with the sandbox name exists
-- [ ] Returns boolean indicating existence
-- [ ] Does not fail if container doesn't exist
-- [ ] Typecheck/lint passes
+- [x] Tool queries Docker to check if container with the sandbox name exists
+- [x] Returns boolean indicating existence
+- [x] Does not fail if container doesn't exist
+- [x] Typecheck/lint passes
 
 ### US-005: Create new sandbox container
 **Description:** As a developer, I want to create a new container with the Crush CLI environment when one doesn't exist for this workspace.
