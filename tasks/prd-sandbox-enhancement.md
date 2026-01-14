@@ -58,11 +58,11 @@ Enhance the existing docker-sandbox-crush wrapper to automatically install and c
 **Description:** As a developer, I want pnpm to be available in the sandbox so I can use it as an alternative package manager without manual installation.
 
 **Acceptance Criteria:**
-- [ ] pnpm is installed during container startup via npm global install
-- [ ] pnpm is available in PATH from container startup
-- [ ] pnpm installation is cached to avoid re-installing on every container start
-- [ ] pnpm version is displayed on container start for verification
-- [ ] Typecheck/lint passes
+- [x] pnpm is installed during container startup via npm global install
+- [x] pnpm is available in PATH from container startup
+- [x] pnpm installation is cached to avoid re-installing on every container start
+- [x] pnpm version is displayed on container start for verification
+- [x] Typecheck/lint passes
 
 ### US-006: Create Crush CLI startup script with caching
 **Description:** As a developer, I want Crush CLI to be automatically installed in the sandbox with caching so it's available on first use without manual installation, but doesn't slow down subsequent startups.

@@ -141,6 +141,13 @@ run_container() {
     echo "Starting container..."
     docker start "$container_name" > /dev/null
 
+    # Install pnpm if not already installed (uses npm cache)
+    if ! docker exec "$container_name" sh -c "command -v pnpm &> /dev/null"; then
+        echo "Installing pnpm..."
+        docker exec "$container_name" npm install -g pnpm > /dev/null 2>&1
+        echo "pnpm installed"
+    fi
+
     # Display npm version for verification
     local npm_version
     npm_version=$(docker exec "$container_name" npm --version 2>/dev/null || echo "not available")
