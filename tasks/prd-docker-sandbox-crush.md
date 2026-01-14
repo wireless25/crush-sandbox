@@ -55,12 +55,12 @@ Create a simple wrapper tool that allows running the Crush CLI agent in a Docker
 **Description:** As a developer, I want to create a new container with the Crush CLI environment when one doesn't exist for this workspace.
 
 **Acceptance Criteria:**
-- [ ] Container is created from a base image (e.g., `node:18-alpine` or similar suitable for Crush)
-- [ ] Current working directory is mounted at the same absolute path (read/write)
-- [ ] Git user.name and user.email are passed as environment variables if available
-- [ ] Container is created in stopped state (not started yet)
-- [ ] Container name matches the deterministic naming scheme
-- [ ] Typecheck/lint passes
+- [x] Container is created from a base image (e.g., `node:18-alpine` or similar suitable for Crush)
+- [x] Current working directory is mounted at the same absolute path (read/write)
+- [x] Git user.name and user.email are passed as environment variables if available
+- [x] Container is created in stopped state (not started yet)
+- [x] Container name matches the deterministic naming scheme
+- [x] Typecheck/lint passes
 
 ### US-006: Start sandbox container and run Crush CLI
 **Description:** As a developer, I want the tool to start the sandbox container and execute the Crush CLI inside it.

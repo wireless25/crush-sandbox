@@ -67,6 +67,34 @@ container_exists() {
     return $?
 }
 
+create_container() {
+    local workspace="$1"
+    local container_name="$2"
+    local git_name="$3"
+    local git_email="$4"
+
+    local base_image="node:18-alpine"
+    local docker_args=(
+        "--name" "$container_name"
+        "-v" "${workspace}:${workspace}"
+        "-w" "$workspace"
+    )
+
+    # Add environment variables for Git config if available
+    if [ -n "$git_name" ]; then
+        docker_args+=("-e" "GIT_USER_NAME=${git_name}")
+    fi
+    if [ -n "$git_email" ]; then
+        docker_args+=("-e" "GIT_USER_EMAIL=${git_email}")
+    fi
+
+    docker_args+=("$base_image")
+    docker_args+=("/bin/sh")
+
+    echo "Creating container from image: ${base_image}"
+    docker create "${docker_args[@]}"
+}
+
 run_command() {
     # Validate Docker is available
     if ! validate_docker; then
@@ -83,13 +111,6 @@ run_command() {
     container_name="$(get_container_name "$workspace")"
     echo "Container name: $container_name"
 
-    # Check if container exists
-    if container_exists "$container_name"; then
-        echo "Container exists: yes"
-    else
-        echo "Container exists: no"
-    fi
-
     # Read Git config
     local git_config
     git_config="$(read_git_config)"
@@ -103,7 +124,15 @@ run_command() {
         echo "Git user.email: $git_email"
     fi
 
-    # TODO: Continue with US-005 through US-006
+    # Check if container exists, create if not
+    if container_exists "$container_name"; then
+        echo "Reusing existing container"
+    else
+        echo "Creating new container"
+        create_container "$workspace" "$container_name" "$git_name" "$git_email"
+    fi
+
+    # TODO: Continue with US-006
 }
 
 # Main script logic
