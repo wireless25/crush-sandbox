@@ -11,6 +11,7 @@ print_usage() {
     echo "  run     Run Crush CLI in Docker sandbox"
     echo "  clean   Remove the sandbox container for current workspace"
     echo "  install Install this script to /usr/local/bin"
+    echo "  update  Update to the latest version"
     echo ""
     echo "Options:"
     echo "  --version  Show version information"
@@ -389,6 +390,80 @@ install_command() {
     echo "  docker-sandbox-crush --help"
 }
 
+update_command() {
+    local script_path="${BASH_SOURCE[0]}"
+    local remote_url="https://raw.githubusercontent.com/wireless25/crush-sandbox/main/docker-sandbox-crush"
+    local temp_file="/tmp/docker-sandbox-crush-update.$$"
+
+    echo "Checking for updates..."
+
+    # Download latest version to temp file
+    echo "Downloading latest version from GitHub..."
+    if ! curl -fsSL "$remote_url" -o "$temp_file"; then
+        echo "Error: Failed to download latest version from $remote_url" >&2
+        rm -f "$temp_file"
+        exit 1
+    fi
+
+    # Make executable so we can validate it
+    chmod +x "$temp_file"
+
+    # Extract version from downloaded file using grep and cut
+    local remote_version
+    remote_version=$(grep '^VERSION=' "$temp_file" | head -1 | cut -d'"' -f2)
+    if [ -z "$remote_version" ]; then
+        echo "Error: Failed to determine remote version" >&2
+        rm -f "$temp_file"
+        exit 1
+    fi
+
+    echo "Current version: $VERSION"
+    echo "Latest version:  $remote_version"
+
+    # Check if already up to date
+    if [ "$remote_version" = "$VERSION" ]; then
+        echo ""
+        echo "✓ You already have the latest version!"
+        rm -f "$temp_file"
+        exit 0
+    fi
+
+    # Confirm update
+    echo ""
+    read -p "Update to version $remote_version? [y/N] " confirm
+    if [[ ! "$confirm" =~ ^[yY] ]]; then
+        echo "Update cancelled"
+        rm -f "$temp_file"
+        exit 0
+    fi
+
+    # Validate that the downloaded script is valid bash
+    if ! bash -n "$temp_file"; then
+        echo "Error: Downloaded script has syntax errors, not updating" >&2
+        rm -f "$temp_file"
+        exit 1
+    fi
+
+    # Replace current script with updated version
+    echo ""
+    echo "Updating docker-sandbox-crush..."
+    if ! mv "$temp_file" "$script_path"; then
+        echo "Error: Failed to update script. Try running with sudo." >&2
+        rm -f "$temp_file"
+        exit 1
+    fi
+
+    # Make executable
+    chmod +x "$script_path"
+
+    echo ""
+    echo "✓ Successfully updated from $VERSION to $remote_version"
+    echo "  Script location: $script_path"
+    echo ""
+    echo "Changes since your version:"
+    echo "  View release notes: https://github.com/wireless25/crush-sandbox/releases"
+}
+
 # Main script logic
 if [ $# -lt 1 ]; then
     print_usage >&2
@@ -433,6 +508,9 @@ case "$COMMAND" in
         ;;
     install)
         install_command
+        ;;
+    update)
+        update_command
         ;;
     *)
         echo "Error: Unknown command: $COMMAND" >&2
