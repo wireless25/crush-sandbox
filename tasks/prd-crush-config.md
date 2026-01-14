@@ -28,10 +28,10 @@ Users need to provide Crush CLI configuration to the Docker sandbox container se
 **Description:** As a developer, I need to identify a Crush configuration folder within the worktree so workspace-specific settings can override host defaults.
 
 **Acceptance Criteria:**
-- [ ] Check for worktree config at `.config/crush/` (relative to workspace root)
-- [ ] Log a warning if worktree config directory doesn't exist (but continue execution)
-- [ ] Fail if worktree config directory exists but is not readable (permission error)
-- [ ] Store validated path in a variable for use in Docker mount commands
+- [x] Check for worktree config at `.config/crush/` (relative to workspace root)
+- [x] Log a warning if worktree config directory doesn't exist (but continue execution)
+- [x] Fail if worktree config directory exists but is not readable (permission error)
+- [x] Store validated path in a variable for use in Docker mount commands
 
 ### US-003: Mount host configuration read-only into container
 **Description:** As a developer, I need to mount the host's Crush configuration directory as read-only inside the container at a standard location.

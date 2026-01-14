@@ -95,6 +95,29 @@ get_host_crush_config_path() {
     echo "$config_path"
 }
 
+get_worktree_crush_config_path() {
+    local workspace="$1"
+    local config_path=""
+
+    # Check .config/crush/ in workspace
+    local config_dir_1="${workspace}/.config/crush"
+    if [ -d "$config_dir_1" ]; then
+        if [ -r "$config_dir_1" ]; then
+            config_path="$config_dir_1"
+        else
+            echo "Error: Worktree Crush config directory exists but is not readable: $config_dir_1" >&2
+            exit 1
+        fi
+    fi
+
+    # Log warning if no config directory found (but continue execution)
+    if [ -z "$config_path" ]; then
+        echo "Warning: No worktree Crush config directory found (checked .crush/ and .config/crush/)" >&2
+    fi
+
+    echo "$config_path"
+}
+
 get_container_name() {
     local workspace="$1"
     # Use md5 hash of workspace path for deterministic container name
