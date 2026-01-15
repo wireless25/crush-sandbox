@@ -2,7 +2,7 @@
 
 set -e
 
-VERSION="0.2.0"
+VERSION="0.3.0"
 
 print_usage() {
     echo "Usage: docker-sandbox-crush <command> [options]"
@@ -14,9 +14,10 @@ print_usage() {
     echo "  update  Update to the latest version"
     echo ""
     echo "Options:"
-    echo "  --version  Show version information"
-    echo "  --force    Skip confirmation for clean command"
-    echo "  --shell    Start interactive shell instead of Crush CLI (for debugging)"
+    echo "  --version          Show version information"
+    echo "  --force            Skip confirmation for clean command"
+    echo "  --shell            Start interactive shell instead of Crush CLI (for debugging)"
+    echo "  --no-host-config    Skip mounting host Crush config directory"
 }
 
 validate_docker() {
@@ -74,45 +75,9 @@ get_host_crush_config_path() {
         fi
     fi
 
-    # If not found, check ~/.crush/
-    if [ -z "$config_path" ]; then
-        local config_dir_2="$HOME/.crush"
-        if [ -d "$config_dir_2" ]; then
-            if [ -r "$config_dir_2" ]; then
-                config_path="$config_dir_2"
-            else
-                echo "Error: Crush config directory exists but is not readable: $config_dir_2" >&2
-                exit 1
-            fi
-        fi
-    fi
-
     # Log warning if no config directory found (but continue execution)
     if [ -z "$config_path" ]; then
-        echo "Warning: No host Crush config directory found (checked ~/.config/crush/ and ~/.crush/)" >&2
-    fi
-
-    echo "$config_path"
-}
-
-get_worktree_crush_config_path() {
-    local workspace="$1"
-    local config_path=""
-
-    # Check .config/crush/ in workspace
-    local config_dir_1="${workspace}/.config/crush"
-    if [ -d "$config_dir_1" ]; then
-        if [ -r "$config_dir_1" ]; then
-            config_path="$config_dir_1"
-        else
-            echo "Error: Worktree Crush config directory exists but is not readable: $config_dir_1" >&2
-            exit 1
-        fi
-    fi
-
-    # Log warning if no config directory found (but continue execution)
-    if [ -z "$config_path" ]; then
-        echo "Warning: No worktree Crush config directory found (checked .crush/ and .config/crush/)" >&2
+        echo "Warning: No host Crush config directory found (checked ~/.config/crush/)" >&2
     fi
 
     echo "$config_path"
@@ -166,7 +131,6 @@ create_container() {
     local git_email="$4"
     local cache_volume_name="$5"
     local host_config_path="$6"
-    local worktree_config_path="$7"
 
     local base_image="node:18-alpine"
     local docker_args=(
@@ -179,11 +143,6 @@ create_container() {
     # Mount host Crush config read-only if available
     if [ -n "$host_config_path" ]; then
         docker_args+=("-v" "${host_config_path}:/host-crush-config:ro")
-    fi
-
-    # Mount worktree Crush config read-only if available
-    if [ -n "$worktree_config_path" ]; then
-        docker_args+=("-v" "${worktree_config_path}:/worktree-crush-config:ro")
     fi
 
     # Configure npm cache to use persistent volume
@@ -238,9 +197,36 @@ EOF
     docker exec "$container_name" chmod +x /usr/local/bin/setup-crush.sh > /dev/null 2>&1
 }
 
+setup_crush_config_script() {
+    local container_name="$1"
+
+    # Create the config merge script inside the container
+    docker exec "$container_name" sh -c 'cat > /usr/local/bin/setup-crush-config.sh << '\''EOF'\''
+#!/bin/sh
+
+# Create merged config directory
+mkdir -p /tmp/crush-config/merged
+
+# Copy host config if available
+if [ -d /host-crush-config ]; then
+    cp -r /host-crush-config/* /tmp/crush-config/merged/ 2>/dev/null || true
+    echo "Merged host configuration from /host-crush-config"
+fi
+
+# Set CRUSH_GLOBAL_CONFIG environment variable
+export CRUSH_GLOBAL_CONFIG=/tmp/crush-config/merged
+echo "Configuration merged to: \$CRUSH_GLOBAL_CONFIG"
+EOF
+' > /dev/null 2>&1
+
+    # Make the script executable
+    docker exec "$container_name" chmod +x /usr/local/bin/setup-crush-config.sh > /dev/null 2>&1
+}
+
 run_container() {
     local container_name="$1"
     local shell_mode="$2"
+    local host_config_path="$3"
 
     # Start the container (or restart if it was stopped)
     echo "Starting container..."
@@ -248,12 +234,17 @@ run_container() {
 
     # Setup Crush CLI script
     setup_crush_script "$container_name"
+    setup_crush_config_script "$container_name"
 
     # Run Crush CLI setup script
     echo "Setting up Crush CLI..."
     if ! docker exec "$container_name" /usr/local/bin/setup-crush.sh; then
         echo "Warning: Failed to setup Crush CLI"
     fi
+
+    # Setup configuration and set CRUSH_GLOBAL_CONFIG
+    echo "Setup Crush configuration..."
+    docker exec "$container_name" /usr/local/bin/setup-crush-config.sh
 
     # Install pnpm if not already installed (uses npm cache)
     if ! docker exec "$container_name" sh -c "command -v pnpm &> /dev/null"; then
@@ -278,27 +269,33 @@ run_container() {
     docker exec "$container_name" sh -c "if command -v pnpm &> /dev/null; then pnpm config set cache-dir /workspace-cache/pnpm/cache 2>/dev/null || true; fi" > /dev/null 2>&1
 
     # Execute command in container
+    # Build docker exec args
+    local docker_exec_args=""
+
+    # Add CRUSH_GLOBAL_CONFIG
+    docker_exec_args="$docker_exec_args -e CRUSH_GLOBAL_CONFIG=/tmp/crush-config/merged"
+
     if [ "$shell_mode" = "true" ]; then
         # Execute an interactive shell in the container (for debugging)
         echo "Starting interactive shell in sandbox..."
         if [ -t 0 ]; then
             # Interactive mode with TTY
-            docker exec -it "$container_name" /bin/sh
+            docker exec -it $docker_exec_args "$container_name" /bin/sh
         else
             # Non-interactive mode (for testing)
             echo "Warning: Not running in TTY mode, starting shell anyway..."
-            docker exec -i "$container_name" /bin/sh
+            docker exec -i $docker_exec_args "$container_name" /bin/sh
         fi
     else
         # Execute Crush CLI
         echo "Starting Crush CLI..."
         if [ -t 0 ]; then
             # Interactive mode with TTY
-            docker exec -it "$container_name" crush
+            docker exec -it $docker_exec_args "$container_name" crush
         else
             # Non-interactive mode (for testing)
             echo "Warning: Not running in TTY mode, starting Crush CLI anyway..."
-            docker exec -i "$container_name" crush
+            docker exec -i $docker_exec_args "$container_name" crush
         fi
     fi
 
@@ -346,17 +343,27 @@ run_command() {
     fi
 
     # Get host Crush config path
-    local host_config_path
-    host_config_path="$(get_host_crush_config_path)"
-    if [ -n "$host_config_path" ]; then
-        echo "Host Crush config: $host_config_path"
-    fi
-
-    # Get worktree Crush config path
-    local worktree_config_path
-    worktree_config_path="$(get_worktree_crush_config_path "$workspace")"
-    if [ -n "$worktree_config_path" ]; then
-        echo "Worktree Crush config: $worktree_config_path"
+    local host_config_path=""
+    if [ "$NO_HOST_CONFIG" = "true" ]; then
+        echo "Skipping host Crush config (--no-host-config)"
+    elif [ -n "$CUSTOM_CONFIG_PATH" ]; then
+        # Use custom config path
+        if [ -d "$CUSTOM_CONFIG_PATH" ]; then
+            if [ -r "$CUSTOM_CONFIG_PATH" ]; then
+                host_config_path="$CUSTOM_CONFIG_PATH"
+                echo "Using custom Crush config: $host_config_path"
+            else
+                echo "Error: Custom config directory exists but is not readable: $CUSTOM_CONFIG_PATH" >&2
+                exit 1
+            fi
+        else
+            echo "Warning: Custom config directory not found: $CUSTOM_CONFIG_PATH" >&2
+        fi
+    else
+        host_config_path="$(get_host_crush_config_path)"
+        if [ -n "$host_config_path" ]; then
+            echo "Host Crush config: $host_config_path"
+        fi
     fi
 
     # Check if container exists, create if not
@@ -364,11 +371,11 @@ run_command() {
         echo "Reusing existing container"
     else
         echo "Creating new container"
-        create_container "$workspace" "$container_name" "$git_name" "$git_email" "$cache_volume_name" "$host_config_path" "$worktree_config_path"
+        create_container "$workspace" "$container_name" "$git_name" "$git_email" "$cache_volume_name" "$host_config_path"
     fi
 
     # Run the container
-    run_container "$container_name" "$SHELL_MODE"
+    run_container "$container_name" "$SHELL_MODE" "$host_config_path"
 }
 
 clean_command() {
@@ -560,17 +567,42 @@ COMMAND=""
 FORCE="false"
 SHELL_MODE="false"
 SHOW_VERSION="false"
+NO_HOST_CONFIG="false"
 
-for arg in "$@"; do
-    if [ "$arg" = "--version" ]; then
-        SHOW_VERSION="true"
-    elif [ "$arg" = "--force" ]; then
-        FORCE="true"
-    elif [ "$arg" = "--shell" ]; then
-        SHELL_MODE="true"
-    elif [ -z "$COMMAND" ]; then
-        COMMAND="$arg"
-    fi
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --version)
+            SHOW_VERSION="true"
+            shift
+            ;;
+        --force)
+            FORCE="true"
+            shift
+            ;;
+        --shell)
+            SHELL_MODE="true"
+            shift
+            ;;
+        --no-host-config)
+            NO_HOST_CONFIG="true"
+            shift
+            ;;
+        -*)
+            echo "Error: Unknown option: $1" >&2
+            print_usage
+            exit 1
+            ;;
+        *)
+            if [ -z "$COMMAND" ]; then
+                COMMAND="$1"
+            else
+                echo "Error: Unexpected argument: $1" >&2
+                print_usage
+                exit 1
+            fi
+            shift
+            ;;
+    esac
 done
 
 # Show version and exit if requested

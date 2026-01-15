@@ -53,6 +53,78 @@ This will validate Docker is available and install the script to `/usr/local/bin
 - **Git config injection**: Your Git user.name and user.email are passed into the container
 - **Container reuse**: Containers are stopped but not removed, enabling fast restarts
 - **Debugging support**: Use `--shell` flag to get an interactive shell instead of Crush CLI
+- **Configuration support**: Automatically mounts and merges Crush configuration from host
+
+## ⚙️ Configuration
+
+The Docker sandbox automatically provides Crush CLI configuration:
+
+### Configuration Sources
+
+**Host configuration** (global defaults):
+- `~/.config/crush/`
+
+**Workspace configuration** (workspace-specific):
+- `.crush.json` or `crush.json` (relative to workspace root)
+
+If you maintain global Crush config with commands, skills, or settings, this will be mounted into the container. Any workspace-specific config will override these settings.
+Config files in the workspace are mounted into the container with the rest of the code and take precedence over host config by default in Crush. Make sure to configure your skills
+and commands accordingly. If you want to use global configured skills, add the `/tmp/crush-config/merged/skills` path to the skills option in the config (global on host or in workspace) to make Crush pick them up.
+
+**Example to include skills from global host in the config**:
+```json
+{
+  "$schema": "https://charm.land/crush.json",
+  "options": {
+    "skills_paths": [
+      "~/.config/crush/skills",
+      "/tmp/crush-config/merged/skills"
+    ]
+  }
+}
+```
+
+With this configuration, you can still use `crush` on your host machine with the same setup.
+
+### Configuration Merge Behavior
+
+1. Host configuration is copied to the container
+2. Workspace configuration is mounted with the workspace, **overwriting** host config (Crush default behavior)
+3. Host configuration is available at `/tmp/crush-config/merged` inside the container
+4. `CRUSH_GLOBAL_CONFIG` environment variable is set to this location
+
+This means workspace-specific settings always override global defaults.
+
+### Security
+
+- All configuration mounts are **read-only** (`:ro` flag)
+- The container cannot modify your host configuration files
+
+### Configuration Control Flags
+
+You can control configuration behavior with these flags:
+
+| Flag | Description |
+|------|-------------|
+| `--no-host-config` | Skip mounting host Crush config directory |
+
+**Examples**:
+
+```bash
+# Skip host configuration
+docker-sandbox-crush run --no-host-config
+```
+
+### Configuration Directory Structure Example
+
+```
+~/.config/crush/                    # Host configuration (global)
+├── crush.json                     # Main Crush config
+└── skills                         # Skills directory
+└── commands                       # Commands directory
+```
+
+If you have a `crush.json` or `.crush.json` already in the workspace root, this will take precedence over the `.config/crush/` directory by Crush CLI's own behavior.
 
 ## 📖 Usage
 

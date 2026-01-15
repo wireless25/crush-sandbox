@@ -10,6 +10,8 @@ This is a minimal bash wrapper script that creates a Docker sandbox environment 
 - Per-workspace container isolation (one sandbox per workspace directory)
 - Persistent cache volumes for npm/pnpm
 - Automatic Crush CLI installation on first use
+- Automatic configuration mounting and merging (host)
+- Secret extraction and injection as environment variables
 
 ## Project Structure
 
@@ -19,7 +21,8 @@ docker-sandbox-crush/
 └── tasks/
     ├── prd-docker-sandbox-crush.md        # Original PRD for core functionality
     ├── prd-sandbox-enhancement.md         # PRD for cache persistence and enhancements
-    └── prd-distribution-and-docs.md      # PRD for distribution/docs (not yet implemented)
+    ├── prd-distribution-and-docs.md      # PRD for distribution/docs (not yet implemented)
+    └── prd-crush-config.md               # PRD for Crush configuration management
 ```
 
 ## Commands
@@ -34,8 +37,9 @@ docker-sandbox-crush/
 
 - `--force` - Skip confirmation prompts (use with `clean` command)
 - `--shell` - Start an interactive shell instead of Crush CLI (for debugging)
-- `--version` - Not yet implemented (see PRD-distribution-and-docs.md)
-- `update` - Not yet implemented (see PRD-distribution-and-docs.md)
+- `--version` - Show version information
+- `--no-host-config` - Skip mounting host Crush config directory
+- `update` - Update to the latest version (implemented)
 
 ## Essential Testing Commands
 
@@ -138,6 +142,20 @@ Removes sandbox resources:
 3. Removes cache volume
 4. Requires confirmation unless `--force` flag is set
 
+### `get_host_crush_config_path()`
+Detects and validates host Crush configuration directory.
+- Checks `~/.config/crush/`
+- Validates directory exists and is readable
+- Returns empty string with warning if no config found
+- Exits with error if directory exists but is not readable
+
+### `setup_crush_config_script()`
+Creates a startup script inside the container at `/usr/local/bin/setup-crush-config.sh` that:
+- Creates merged config directory at `/tmp/crush-config/merged/`
+- Copies host config from `/host-crush-config` if available
+- Sets `CRUSH_GLOBAL_CONFIG` environment variable to merged directory
+- Logs which sources were merged
+
 ## Code Patterns and Conventions
 
 ### Naming Conventions
@@ -221,6 +239,13 @@ Removes sandbox resources:
 - Passed as environment variables, not written to container's git config
 - Crush CLI inside container can use these env vars for git operations
 
+### Configuration Handling
+- Host config detected from `~/.config/crush/`
+- Configuration mounted read-only inside container at `/host-crush-config`
+- `CRUSH_GLOBAL_CONFIG` environment variable set to merged config directory
+- Secret files detected by pattern and injected as environment variables
+- All mounts are read-only for security (container cannot modify host files)
+
 ## Technical Specifications
 
 ### Base Image
@@ -234,13 +259,6 @@ Removes sandbox resources:
 - **pnpm store**: `/workspace-cache/pnpm/store` (via `NPM_CONFIG_STORE` env var)
 - **pnpm cache**: `/workspace-cache/pnpm/cache` (via `pnpm config set cache-dir`)
 
-### Environment Variables Injected
-- `GIT_USER_NAME` - from `user.name` in `~/.gitconfig`
-- `GIT_USER_EMAIL` - from `user.email` in `~/.gitconfig`
-- `npm_config_cache` - set to `/workspace-cache/npm`
-- `NPM_CONFIG_STORE` - set to `/workspace-cache/pnpm/store`
-- `npm_config_store` - alternate form for pnpm compatibility
-
 ### Script Entry Points
 - Main logic in `case` statement at end of script
 - Argument parsing loop sets `COMMAND`, `FORCE`, `SHELL_MODE`
@@ -252,7 +270,8 @@ Removes sandbox resources:
 |-----|--------|
 | `prd-docker-sandbox-crush.md` | ✅ Complete (all acceptance criteria checked) |
 | `prd-sandbox-enhancement.md` | ✅ Complete (all acceptance criteria checked) |
-| `prd-distribution-and-docs.md` | ❌ Not started (no remote distribution yet) |
+| `prd-distribution-and-docs.md` | ⚠️ Partially complete (version and update implemented, README and LICENSE done) |
+| `prd-crush-config.md` | ✅ Complete (all acceptance criteria checked) |
 
 ## Development Workflow
 
@@ -280,10 +299,6 @@ Removes sandbox resources:
 ## Future Enhancements (Not Yet Implemented)
 
 From `prd-distribution-and-docs.md`:
-- `--version` flag to display version
-- `update` command to download latest version from remote
-- Remote installation via curl from GitHub
-- Comprehensive README documentation
 - GitHub releases with version tags
 - LICENSE file
 
@@ -309,3 +324,9 @@ From `prd-distribution-and-docs.md`:
 ### Container name changes unexpectedly
 - Ensure you're in the same workspace directory
 - Container name is based on current working directory (not script location)
+
+### Configuration not being mounted
+- Check that config directories exist: `ls ~/.config/crush` or `ls ~/.crush`
+- Verify directory is readable: `test -r ~/.config/crush && echo readable`
+- Check script output for warnings about missing config
+- Use `--shell` flag to inspect inside container: `ls /host-crush-config`
