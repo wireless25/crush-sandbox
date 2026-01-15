@@ -32,11 +32,11 @@ Implement comprehensive security improvements for the docker-sandbox-crush tool 
 **Description:** As a security-conscious user, I want the container to run as non-root so that if the agent exploits a vulnerability, the impact is limited.
 
 **Acceptance Criteria:**
-- [ ] Add `--user` flag with `$(id -u):$(id -g)` to docker_args in create_container function
-- [ ] Ensure workspace mount permissions work correctly with non-root user
-- [ ] Ensure cache volume is accessible to non-root user
-- [ ] Manual test: Run container and verify user is not root (docker exec whoami)
-- [ ] Manual test: Verify Crush CLI can read/write workspace files
+- [x] Add `--user` flag with `$(id -u):$(id -g)` to docker_args in create_container function
+- [x] Ensure workspace mount permissions work correctly with non-root user
+- [x] Ensure cache volume is accessible to non-root user
+- [x] Manual test: Run container and verify user is not root (docker exec whoami)
+- [x] Manual test: Verify Crush CLI can read/write workspace files
 
 ### US-003: Add security section to README
 **Description:** As a user, I want security best practices documented so I understand how to use the tool safely in production.
