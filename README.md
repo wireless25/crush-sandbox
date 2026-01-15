@@ -192,6 +192,128 @@ This will:
 docker-sandbox-crush --help
 ```
 
+## 🔒 Security
+
+### Security Overview
+
+The docker-sandbox-crush tool implements several security controls to make AI-assisted development safe(er). However, the tool requires you to follow certain security practices to ensure safe operation.
+Crush asks for your permission before performing any operation, but if you use `--yolo` mode or use it programmatically with `crush run` in a ralph loop, you must be aware of the security implications.
+
+### Read-Write Workspace Access
+
+The Crush agent inside the container has **full read-write access** to your workspace files. This is intentional and necessary for the agent to:
+
+- Read and modify source code files
+- Run build commands and tests
+- Create new files and directories
+- Install packages and dependencies
+- Execute git operations
+
+**Security Implications:**
+
+1. **Trust the AI agent**: The agent can modify any file in your workspace
+2. **Credential exposure risk**: Never store secrets (API keys, passwords, tokens) in your workspace files
+3. **Review all changes**: Always review agent-generated changes
+4. **Use version control**: Git provides a safety net - you can revert any unwanted changes
+
+**Best Practices:**
+
+- Store credentials in:
+  - Environment variables
+  - Secret management tools
+  - CI/CD pipeline secrets (GitHub Actions Secrets, GitLab CI Variables)
+  - `.env` files that are gitignored
+- Never commit credentials to git
+- Use `.gitignore` to exclude files with secrets
+- Rotate credentials if they were ever committed accidentally
+
+### Git Branch Protection for Production
+
+When planning to use `--yolo` mode or use it programmatically with `crush run`, you should configure git branch protection to prevent direct pushes to production branches. This ensures:
+
+- All agent-generated code goes through a pull request process
+- Code review is required before merging
+- CI/CD checks must pass before merging
+- Unauthorized direct commits are blocked
+
+### What the Agent Can and Cannot Do
+
+#### Capabilities
+
+The Crush agent inside the sandbox container can:
+
+✅ **Read and write workspace files**
+- Full access to all files in the mounted workspace
+- Can create, modify, delete any file
+- Can execute any command within the workspace
+
+✅ **Run commands and scripts**
+- Execute build commands (npm build, cargo build, etc.)
+- Run tests (npm test, pytest, etc.)
+- Install packages (npm install, pip install, etc.)
+
+✅ **Make git operations**
+- Create commits
+- Create branches
+- Stage files
+- Push to remote repositories
+
+✅ **Access network resources**
+- Download dependencies from npm, PyPI, etc.
+- Make HTTP requests (if in code)
+- Clone other git repositories
+
+#### Limitations
+
+The Crush agent cannot:
+
+❌ **Access files outside the workspace**
+- Container is limited to mounted workspace directory
+- Cannot access your home directory (except workspace subdirectories)
+- Cannot access system files or other projects
+
+❌ **Run with elevated privileges**
+- Container runs as non-root user
+- Cannot install system packages globally
+- Cannot modify Docker host
+
+❌ **Escalate privileges**
+- Docker capabilities are dropped (except CHOWN and DAC_OVERRIDE)
+- Cannot gain root access
+- Cannot modify container configuration
+
+❌ **Access host resources directly**
+- No direct access to host network
+- No access to host filesystem beyond workspace
+- Cannot interact with other containers
+
+#### Security Controls in Place
+
+The tool implements these security controls:
+
+1. **Resource limits** - Prevents resource exhaustion attacks:
+   - Memory limited to 4GB
+   - CPU limited to 2 cores
+   - Process count limited to 100 PIDs
+
+2. **Non-root user** - Limits attack surface:
+   - Container runs as your UID/GID
+   - Cannot perform privileged operations
+
+3. **Capability dropping** - Reduces Linux capabilities:
+   - All capabilities dropped by default
+   - CHOWN and DAC_OVERRIDE added back (required for cache and workspace access)
+
+4. **Credential scanning** - Warns about exposed secrets:
+   - Scans workspace with gitleaks before starting
+   - Prompts you to continue or abort if credentials detected
+   - Can be bypassed with `--no-cred-scan` flag (use with caution)
+
+5. **Workspace isolation** - Prevents cross-project contamination:
+   - Each workspace has its own container
+   - Caches are per-workspace
+   - No shared state between workspaces
+
 ## 🔧 How It Works
 
 ### Workspace Isolation
