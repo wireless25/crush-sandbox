@@ -138,6 +138,10 @@ create_container() {
         "-v" "${workspace}:${workspace}"
         "-v" "${cache_volume_name}:/workspace-cache"
         "-w" "$workspace"
+        "--memory=4g"
+        "--memory-swap=4g"
+        "--cpus=2.0"
+        "--ulimit" "nproc=100"
     )
 
     # Mount host Crush config read-only if available
