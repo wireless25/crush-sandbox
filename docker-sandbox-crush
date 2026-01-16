@@ -4,6 +4,9 @@ set -e
 
 VERSION="0.3.0"
 
+# Docker image configuration - can be overridden via DOCKER_SANDBOX_IMAGE environment variable
+DOCKER_IMAGE="${DOCKER_SANDBOX_IMAGE:-node:22-alpine}"
+
 print_usage() {
     echo "Usage: docker-sandbox-crush <command> [options]"
     echo ""
@@ -278,7 +281,7 @@ create_cache_volume() {
     docker volume create "$cache_volume_name" > /dev/null
 
     # Fix permissions for node user (UID 1000) so it can write to the cache
-    docker run --rm -v "${cache_volume_name}:/workspace-cache" node:18-alpine chown -R 1000:1000 /workspace-cache > /dev/null 2>&1 || true
+    docker run --rm -v "${cache_volume_name}:/workspace-cache" "${DOCKER_IMAGE}" chown -R 1000:1000 /workspace-cache > /dev/null 2>&1 || true
 
     echo "Cache volume created: $cache_volume_name"
 }
@@ -291,7 +294,7 @@ create_container() {
     local cache_volume_name="$5"
     local host_config_path="$6"
 
-    local base_image="node:18-alpine"
+    local base_image="${DOCKER_IMAGE}"
     local docker_args=(
         "--name" "$container_name"
         "-v" "${workspace}:${workspace}"

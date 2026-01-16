@@ -43,6 +43,11 @@ docker-sandbox-crush/
 - `--no-host-config` - Skip mounting host Crush config directory
 - `--cred-scan` - Enable credential scanning before starting container
 
+### Environment Variables
+
+- `DOCKER_SANDBOX_IMAGE` - Override the Docker image (default: `node:22-alpine`)
+- Example: `DOCKER_SANDBOX_IMAGE=node:20-alpine docker-sandbox-crush run`
+
 ## Essential Testing Commands
 
 There are **no automated tests** in this project. Testing is manual:
@@ -53,6 +58,9 @@ docker info
 
 # Test the tool (from within a workspace)
 ./docker-sandbox-crush run
+
+# Test with a different Docker image
+DOCKER_SANDBOX_IMAGE=node:20-alpine ./docker-sandbox-crush run
 
 # Test with shell mode for debugging
 ./docker-sandbox-crush run --shell
@@ -106,7 +114,7 @@ Creates a named Docker volume for caching if it doesn't already exist.
 
 ### `create_container()`
 Creates a new Docker container with:
-- Base image: `node:18-alpine`
+- Base image: `node:22-alpine` (configurable via `DOCKER_SANDBOX_IMAGE`)
 - Workspace mounted at same absolute path (read/write)
 - Cache volume mounted at `/workspace-cache`
 - Git config passed as environment variables (`GIT_USER_NAME`, `GIT_USER_EMAIL`)
@@ -308,7 +316,8 @@ Creates a startup script inside the container at `/usr/local/bin/setup-crush-con
 ## Technical Specifications
 
 ### Base Image
-- `node:18-alpine` - Minimal Node.js environment
+- Default: `node:22-alpine` - Minimal Node.js environment
+- Can be overridden via `DOCKER_SANDBOX_IMAGE` environment variable
 - Includes npm pre-installed
 - Alpine Linux for small footprint
 - Uses `tail -f /dev/null` to keep container running
