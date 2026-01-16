@@ -18,6 +18,7 @@ print_usage() {
     echo "  --force            Skip confirmation for clean command"
     echo "  --shell            Start interactive shell instead of Crush CLI (for debugging)"
     echo "  --no-host-config    Skip mounting host Crush config directory"
+    echo "  --cred-scan        Enable credential scanning before starting container"
 }
 
 validate_docker() {
@@ -31,6 +32,69 @@ validate_docker() {
     if ! docker info &> /dev/null; then
         echo "Error: docker daemon is not running or not accessible" >&2
         return 1
+    fi
+
+    return 0
+}
+
+validate_workspace_path() {
+    local workspace="$1"
+
+    # Check for problematic shell metacharacters that could cause command injection
+    # Use grep for reliable pattern matching
+
+    # Check for dollar sign
+    if echo "$workspace" | grep -q '\$'; then
+        echo "Error: Workspace path contains invalid character '\$': $workspace" >&2
+        exit 1
+    fi
+
+    # Check for backtick
+    if echo "$workspace" | grep -q '\`'; then
+        echo "Error: Workspace path contains invalid character 'backtick': $workspace" >&2
+        exit 1
+    fi
+
+    # Check for backslash
+    if echo "$workspace" | grep -q '\\'; then
+        echo "Error: Workspace path contains invalid character 'backslash': $workspace" >&2
+        exit 1
+    fi
+
+    # Check for semicolon
+    if echo "$workspace" | grep -q ';'; then
+        echo "Error: Workspace path contains invalid character ';': $workspace" >&2
+        exit 1
+    fi
+
+    # Check for pipe
+    if echo "$workspace" | grep -q '|'; then
+        echo "Error: Workspace path contains invalid character '|': $workspace" >&2
+        exit 1
+    fi
+
+    # Check for ampersand
+    if echo "$workspace" | grep -q '&'; then
+        echo "Error: Workspace path contains invalid character '&': $workspace" >&2
+        exit 1
+    fi
+
+    # Check for less than
+    if echo "$workspace" | grep -q '<'; then
+        echo "Error: Workspace path contains invalid character '<': $workspace" >&2
+        exit 1
+    fi
+
+    # Check for greater than
+    if echo "$workspace" | grep -q '>'; then
+        echo "Error: Workspace path contains invalid character '>': $workspace" >&2
+        exit 1
+    fi
+
+    # Check for command substitution pattern $(...)
+    if echo "$workspace" | grep -q '\$('; then
+        echo "Error: Workspace path contains command substitution pattern: $workspace" >&2
+        exit 1
     fi
 
     return 0
@@ -83,21 +147,112 @@ get_host_crush_config_path() {
     echo "$config_path"
 }
 
+
+ensure_gitleaks_image() {
+    local gitleaks_image="ghcr.io/gitleaks/gitleaks:latest"
+
+    # Check if gitleaks image exists locally (fast path)
+    if docker images --format '{{.Repository}}:{{.Tag}}' | grep -q "^${gitleaks_image}$"; then
+        return 0
+    fi
+
+    echo "Pulling gitleaks Docker image for credential scanning..."
+    if docker pull "$gitleaks_image" > /dev/null 2>&1; then
+        echo "✓ gitleaks Docker image pulled successfully"
+        return 0
+    else
+        echo "Warning: Failed to pull gitleaks Docker image" >&2
+        echo "  Credential scanning will be unavailable" >&2
+        return 1
+    fi
+}
+
+scan_credentials() {
+    local workspace="$1"
+    local enable_scan="$2"
+    local gitleaks_image="ghcr.io/gitleaks/gitleaks:latest"
+
+    # Skip scanning unless explicitly enabled
+    if [ "$enable_scan" != "true" ]; then
+        return 0
+    fi
+
+    # Ensure gitleaks image is available
+    ensure_gitleaks_image
+
+    # Check if gitleaks image exists locally (may have failed to pull)
+    if ! docker images --format '{{.Repository}}:{{.Tag}}' | grep -q "^${gitleaks_image}$"; then
+        echo "Warning: gitleaks Docker image not available - credential scanning skipped" >&2
+        return 0
+    fi
+
+    echo "Scanning workspace for credentials..."
+
+    # Run gitleaks scan using Docker image
+    local scan_output
+    local exit_code
+    
+    # Capture output and exit code with verbose error handling
+    echo "Running: docker run --rm -v \"${workspace}:/path\" \"$gitleaks_image\" directory /path --no-banner" >&2
+    
+    # Temporarily disable 'set -e' to capture exit code without script termination
+    set +e
+    scan_output=$(docker run --rm -v "${workspace}:/path" "$gitleaks_image" directory /path --no-banner 2>&1)
+    exit_code=$?
+    set -e
+    
+    echo "Gitleaks exit code: $exit_code" >&2
+    if [ -n "$scan_output" ]; then
+        echo "Gitleaks output:" >&2
+        echo "$scan_output" >&2
+    fi
+
+    if [ $exit_code -eq 0 ]; then
+        echo "✓ No credentials detected"
+    elif [ $exit_code -eq 1 ]; then
+        echo "⚠️  WARNING: Potential credentials detected in workspace!"
+        echo ""
+        echo "⚠️  WARNING: Potential credentials detected in workspace!"
+        echo ""
+        echo "Found files that may contain secrets or credentials."
+        echo "For your security, please:"
+        echo "  1. Review and remove any API keys, passwords, or tokens"
+        echo "  2. Add sensitive files to .gitignore"
+        echo "  3. Rotate any exposed credentials"
+        echo ""
+        echo ""
+
+        # Prompt user to continue or abort
+        read -p "Continue anyway? [y/N] " confirm
+        if [[ ! "$confirm" =~ ^[yY] ]]; then
+            echo "Aborted"
+            exit 0
+        fi
+        echo "Proceeding with credential warning..."
+    else
+        echo "ERROR: Something went wrong during credential scan."
+        echo "$scan_output"
+    fi
+
+    return 0
+}
 get_container_name() {
     local workspace="$1"
-    # Use md5 hash of workspace path for deterministic container name
+    # Use SHA256 hash of workspace path for deterministic container name
+    # Truncated to first 12 characters for reasonable length
     # Prefix with 'crush-sandbox-' for readability
     local hash
-    hash="$(echo -n "$workspace" | md5)"
+    hash="$(echo -n "$workspace" | shasum -a 256 | awk '{print $1}' | cut -c1-12)"
     echo "crush-sandbox-${hash}"
 }
 
 get_cache_volume_name() {
     local workspace="$1"
-    # Use md5 hash of workspace path for deterministic volume name
+    # Use SHA256 hash of workspace path for deterministic volume name
+    # Truncated to first 12 characters for reasonable length
     # Prefix with 'crush-cache-' for readability
     local hash
-    hash="$(echo -n "$workspace" | md5)"
+    hash="$(echo -n "$workspace" | shasum -a 256 | awk '{print $1}' | cut -c1-12)"
     echo "crush-cache-${hash}"
 }
 
@@ -147,6 +302,10 @@ create_container() {
         "--memory-swap=4g"
         "--cpus=2.0"
         "--ulimit" "nproc=100"
+        # Security: Drop all capabilities, then add back only what's needed
+        "--cap-drop" "ALL"
+        "--cap-add" "CHOWN"
+        "--cap-add" "DAC_OVERRIDE"
     )
 
     # Mount host Crush config read-only if available
@@ -189,8 +348,12 @@ setup_crush_script() {
 mkdir -p /home/node/.npm-global
 npm config set prefix /home/node/.npm-global
 
+# Add npm global bin to PATH for this script session
+export PATH=/home/node/.npm-global/bin:\$PATH
+
 # Check if Crush CLI is already installed
 if command -v crush >/dev/null 2>&1; then
+    echo "Crush CLI is already installed"
     exit 0
 fi
 
@@ -258,7 +421,7 @@ run_container() {
     docker exec "$container_name" /home/node/setup-crush-config.sh
 
     # Install pnpm if not already installed (uses npm cache)
-    if ! docker exec "$container_name" sh -c "command -v pnpm >/dev/null 2>&1"; then
+    if ! docker exec "$container_name" sh -c "export PATH=/home/node/.npm-global/bin:\$PATH && command -v pnpm >/dev/null 2>&1"; then
         echo "Installing pnpm..."
         docker exec "$container_name" sh -c "npm config set prefix /home/node/.npm-global && npm install -g pnpm" >/dev/null 2>&1
         echo "pnpm installed"
@@ -331,6 +494,12 @@ run_command() {
     local workspace
     workspace="$(get_workspace_info)"
     echo "Workspace: $workspace"
+
+    # Validate workspace path for security (prevent command injection)
+    validate_workspace_path "$workspace"
+
+    # Scan workspace for credentials if enabled (before any container operations)
+    scan_credentials "$workspace" "$CRED_SCAN"
 
     # Get container name
     local container_name
@@ -486,8 +655,11 @@ install_command() {
     # Make executable
     chmod +x "$install_path"
 
+    echo ""
     echo "✓ Successfully installed docker-sandbox-crush to $install_path"
     echo "✓ Docker validated: $(docker --version)"
+    echo ""
+    echo "Note: gitleaks Docker image will be pulled on first use for credential scanning"
     echo ""
     echo "You can now run:"
     echo "  docker-sandbox-crush run      # Start Crush CLI in sandbox"
@@ -501,7 +673,13 @@ install_command() {
 update_command() {
     local script_path="${BASH_SOURCE[0]}"
     local remote_url="https://raw.githubusercontent.com/wireless25/crush-sandbox/main/docker-sandbox-crush"
-    local temp_file="/tmp/docker-sandbox-crush-update.$$"
+    local temp_file
+
+    # Use mktemp for secure temporary file creation (TOCTOU race condition prevention)
+    temp_file=$(mktemp) || {
+        echo "Error: Failed to create temporary file" >&2
+        exit 1
+    }
 
     echo "Checking for updates..."
 
@@ -584,6 +762,7 @@ FORCE="false"
 SHELL_MODE="false"
 SHOW_VERSION="false"
 NO_HOST_CONFIG="false"
+CRED_SCAN="false"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -601,6 +780,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --no-host-config)
             NO_HOST_CONFIG="true"
+            shift
+            ;;
+        --cred-scan)
+            CRED_SCAN="true"
             shift
             ;;
         -*)

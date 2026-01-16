@@ -32,14 +32,16 @@ docker-sandbox-crush/
 - `./docker-sandbox-crush run` - Start the Crush CLI in a Docker sandbox
 - `./docker-sandbox-crush clean` - Remove the sandbox container and cache volume
 - `./docker-sandbox-crush reset` - Alias for `clean`
+- `./docker-sandbox-crush install` - Install the script to `/usr/local/bin/docker-sandbox-crush`
+- `./docker-sandbox-crush update` - Update to the latest version
 
 ### Command Options
 
+- `--version` - Show version information
 - `--force` - Skip confirmation prompts (use with `clean` command)
 - `--shell` - Start an interactive shell instead of Crush CLI (for debugging)
-- `--version` - Show version information
 - `--no-host-config` - Skip mounting host Crush config directory
-- `update` - Update to the latest version (implemented)
+- `--cred-scan` - Enable credential scanning before starting container
 
 ## Essential Testing Commands
 
@@ -78,16 +80,18 @@ Returns the current working directory (absolute path). Used as the base for cont
 Reads `user.name` and `user.email` from `~/.gitconfig`. Returns pipe-delimited string `"name|email"`. Git config is optional - missing values only generate warnings, not errors.
 
 ### `get_container_name()`
-Generates deterministic container name from workspace path using MD5 hash.
-- Pattern: `crush-sandbox-<md5_hash>`
+Generates deterministic container name from workspace path using SHA256 hash (truncated to first 12 characters).
+- Pattern: `crush-sandbox-<sha256_hash>`
 - Same workspace always produces same container name
 - Used for container reuse per workspace
+- SHA256 provides cryptographically secure hashing (vs. MD5)
 
 ### `get_cache_volume_name()`
-Generates deterministic cache volume name from workspace path using MD5 hash.
-- Pattern: `crush-cache-<md5_hash>`
+Generates deterministic cache volume name from workspace path using SHA256 hash (truncated to first 12 characters).
+- Pattern: `crush-cache-<sha256_hash>`
 - Same workspace always produces same volume name
 - Used for persistent package manager caches
+- SHA256 provides cryptographically secure hashing (vs. MD5)
 
 ### `container_exists()`
 Checks if a container with the given name exists (including stopped containers).
@@ -109,6 +113,30 @@ Creates a new Docker container with:
 - npm cache configured to `/workspace-cache/npm`
 - pnpm store/cache configured to `/workspace-cache/pnpm/...`
 - Container runs `tail -f /dev/null` to stay alive
+- **Resource limits** for DoS prevention (4GB memory, 2 CPUs, 100 PIDs)
+- **Non-root user** (UID 1000) for attack surface reduction
+- **Capability dropping** (all dropped, only CHOWN and DAC_OVERRIDE added back)
+
+### `validate_workspace_path()`
+Validates workspace path for security (prevents command injection).
+- Checks for shell metacharacters: `$, `, \, ;, |, &, <, >`
+- Checks for command substitution patterns: `$(...)`
+- Exits with clear error message if invalid characters found
+
+### `ensure_gitleaks_image()`
+Ensures gitleaks Docker image is available for credential scanning.
+- Checks if `ghcr.io/gitleaks/gitleaks:latest` image exists locally (fast path)
+- Pulls image from GitHub Container Registry if not present
+- Shows warning if pull fails (feature degrades gracefully)
+- Called from `scan_credentials()` before scanning
+
+### `scan_credentials()`
+Scans workspace for credentials before container starts.
+- Uses gitleaks Docker image (`ghcr.io/gitleaks/gitleaks:latest`) for secret detection
+- Mounts workspace into gitleaks container for scanning
+- Warns if gitleaks image not available (feature degraded, not failed)
+- Prompts user to continue or abort if credentials detected
+- Can be bypassed with `--no-cred-scan` flag (use with caution)
 
 ### `setup_crush_script()`
 Creates a startup script inside the container at `/usr/local/bin/setup-crush.sh` that:
@@ -129,11 +157,13 @@ Main execution function that:
 Orchestrates the full `run` command flow:
 1. Validates Docker availability
 2. Gets workspace info
-3. Computes container and volume names
-4. Creates cache volume (if needed)
-5. Reads Git config
-6. Creates container (if it doesn't exist) or reuses existing
-7. Runs the container
+3. **Validates workspace path** for security (prevents command injection)
+4. **Scans workspace for credentials** using gitleaks
+5. Computes container and volume names
+6. Creates cache volume (if needed)
+7. Reads Git config
+8. Creates container (if it doesn't exist) or reuses existing
+9. Runs the container
 
 ### `clean_command()`
 Removes sandbox resources:
@@ -141,6 +171,14 @@ Removes sandbox resources:
 2. Removes container
 3. Removes cache volume
 4. Requires confirmation unless `--force` flag is set
+
+### `install_command()`
+Installs docker-sandbox-crush script to system.
+1. Validates Docker is available and running
+2. Downloads latest script from GitHub
+3. Installs script to `/usr/local/bin/docker-sandbox-crush`
+4. Displays installation summary and tool versions
+5. Notes that gitleaks Docker image will be pulled on first use
 
 ### `get_host_crush_config_path()`
 Detects and validates host Crush configuration directory.
@@ -161,7 +199,7 @@ Creates a startup script inside the container at `/usr/local/bin/setup-crush-con
 ### Naming Conventions
 - Container names: `crush-sandbox-<hash>`
 - Volume names: `crush-cache-<hash>`
-- Hash function: MD5 of workspace path (via `md5` command)
+- Hash function: SHA256 of workspace path (via `shasum -a 256`), truncated to 12 chars
 - Functions use snake_case
 - Variables use snake_case for local variables, UPPERCASE for globals
 
@@ -178,6 +216,15 @@ Creates a startup script inside the container at `/usr/local/bin/setup-crush-con
 - Containers execute commands via `docker exec` (not `docker run`)
 - TTY detection: `[ -t 0 ]` to determine if running interactively
 - Interactive mode: `docker exec -it` (with TTY) or `docker exec -i` (without TTY)
+- **Security flags** applied to containers:
+  - `--memory=4g` - Memory limit (prevents resource exhaustion)
+  - `--memory-swap=4g` - No swapping (prevents disk exhaustion)
+  - `--cpus=2.0` - CPU limit (prevents CPU DoS)
+  - `--ulimit nproc=100` - Process limit (prevents fork bomb)
+  - `--user 1000:1000` - Non-root user (limits attack surface)
+  - `--cap-drop ALL` - Drop all capabilities (reduce attack surface)
+  - `--cap-add CHOWN` - Add CHOWN (required for npm cache)
+  - `--cap-add DAC_OVERRIDE` - Add DAC_OVERRIDE (required for workspace access)
 
 ### Bash Patterns
 - Arrays for Docker args: `docker_args=(...)` then `"${docker_args[@]}"`
@@ -246,6 +293,18 @@ Creates a startup script inside the container at `/usr/local/bin/setup-crush-con
 - Secret files detected by pattern and injected as environment variables
 - All mounts are read-only for security (container cannot modify host files)
 
+### Credential Scanning
+- Workspace scanned with gitleaks before container starts
+- Warns if credentials detected (API keys, passwords, tokens)
+- Prompts user to continue or abort if secrets found
+- Can be enabled with `--cred-scan` flag
+
+### Workspace Path Validation
+- Paths validated for shell metacharacters before container creation
+- Prevents command injection attacks via malicious paths
+- Checks for: `$, `, \, ;, |, &, <, >` and command substitution `$(...)`
+- Exits with clear error message if validation fails
+
 ## Technical Specifications
 
 ### Base Image
@@ -253,6 +312,18 @@ Creates a startup script inside the container at `/usr/local/bin/setup-crush-con
 - Includes npm pre-installed
 - Alpine Linux for small footprint
 - Uses `tail -f /dev/null` to keep container running
+
+### Container Security Configuration
+- **User**: Non-root (UID 1000:GID 1000)
+- **Resource limits**:
+  - Memory: 4GB (`--memory=4g`)
+  - Swap: 4GB (no swapping allowed, `--memory-swap=4g`)
+  - CPU: 2 cores (`--cpus=2.0`)
+  - Processes: 100 PIDs (`--ulimit nproc=100`)
+- **Capabilities**:
+  - Drop all capabilities by default (`--cap-drop ALL`)
+  - Add back CHOWN (needed for npm cache ownership)
+  - Add back DAC_OVERRIDE (needed for workspace file access)
 
 ### Cache Configuration
 - **npm cache**: `/workspace-cache/npm` (via `npm_config_cache` env var)
@@ -290,11 +361,23 @@ Creates a startup script inside the container at `/usr/local/bin/setup-crush-con
 
 ## Security Considerations
 
+**Implemented Security Controls:**
 - Script runs with current user's permissions (no sudo required for Docker)
 - Container mounts workspace with read/write access
-- No privilege escalation or special Docker capabilities required
-- Standard Docker isolation applies
+- **Resource limits** prevent DoS attacks (memory, CPU, process count)
+- **Non-root container** user limits attack surface
+- **Capability dropping** reduces Linux capabilities to minimum required
+- **Workspace path validation** prevents command injection
+- **Credential scanning** warns about exposed secrets (via gitleaks)
+- **Cryptographic hashing** (SHA256) for container/volume names
+- **Secure temporary file creation** (mktemp) prevents TOCTOU attacks
+
+**User Responsibilities:**
 - Authentication for Crush CLI must be managed by user (not handled by script)
+- Store credentials in environment variables or secret managers (not in workspace files)
+- Use Git branch protection for production deployments
+- Configure CI/CD with security checks (linting, tests, scanning)
+- Review all AI-generated code before merging
 
 ## Future Enhancements (Not Yet Implemented)
 

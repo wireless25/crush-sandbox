@@ -43,7 +43,12 @@ If you've cloned the repository, you can use the built-in install command:
 ./docker-sandbox-crush install
 ```
 
-This will validate Docker is available and install the script to `/usr/local/bin/docker-sandbox-crush`.
+This will:
+- Validate Docker is available
+- Install the script to `/usr/local/bin/docker-sandbox-crush`
+- Display version information for installed tools
+
+**Note:** gitleaks Docker image will be pulled automatically on first use for credential scanning. No additional installation is required.
 
 ## ✨ Features
 
@@ -306,6 +311,7 @@ The tool implements these security controls:
 
 4. **Credential scanning** - Warns about exposed secrets:
    - Scans workspace with gitleaks before starting
+   - gitleaks is automatically installed when you run `docker-sandbox-crush run --cred-scan`
    - Prompts you to continue or abort if credentials detected
    - Can be bypassed with `--no-cred-scan` flag (use with caution)
 
