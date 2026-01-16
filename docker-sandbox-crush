@@ -2,19 +2,19 @@
 
 set -e
 
-VERSION="0.4.0"
+VERSION="0.5.0"
 
 # Docker image configuration - can be overridden via DOCKER_SANDBOX_IMAGE environment variable
 DOCKER_IMAGE="${DOCKER_SANDBOX_IMAGE:-node:22-alpine}"
 
 print_usage() {
-    echo "Usage: docker-sandbox-crush <command> [options]"
+    echo "Usage: crush-sandbox <command> [options]"
     echo ""
     echo "Commands:"
-    echo "  run     Run Crush CLI in Docker sandbox"
-    echo "  clean   Remove the sandbox container for current workspace"
-    echo "  install Install this script to /usr/local/bin"
-    echo "  update  Update to the latest version"
+    echo "  run           Run Crush CLI in Docker sandbox"
+    echo "  clean         Remove the sandbox container for current workspace"
+    echo "  install       Install this script to /usr/local/bin"
+    echo "  update        Update to the latest version"
     echo ""
     echo "Options:"
     echo "  --version          Show version information"
@@ -624,17 +624,18 @@ clean_command() {
 install_command() {
     # Validate Docker is available before installing
     if ! validate_docker; then
-        echo "Error: Docker is required to use docker-sandbox-crush" >&2
+        echo "Error: Docker is required to use crush-sandbox" >&2
         echo "Please install Docker Desktop and ensure it is running" >&2
         exit 1
     fi
 
-    local install_path="/usr/local/bin/docker-sandbox-crush"
+    local install_path="/usr/local/bin/crush-sandbox"
+    local alias_path="/usr/local/bin/crushbox"
     local remote_url="https://raw.githubusercontent.com/wireless25/crush-sandbox/main/docker-sandbox-crush"
 
     # Check if already installed
     if [ -f "$install_path" ]; then
-        echo "docker-sandbox-crush is already installed at $install_path"
+        echo "crush-sandbox is already installed at $install_path"
         read -p "Do you want to overwrite it? [y/N] " confirm
         if [[ ! "$confirm" =~ ^[yY] ]]; then
             echo "Installation cancelled"
@@ -649,7 +650,7 @@ install_command() {
     fi
 
     # Download the script
-    echo "Downloading docker-sandbox-crush from GitHub..."
+    echo "Downloading crush-sandbox from GitHub..."
     if ! curl -fsSL "$remote_url" -o "$install_path"; then
         echo "Error: Failed to download script from $remote_url" >&2
         exit 1
@@ -658,19 +659,30 @@ install_command() {
     # Make executable
     chmod +x "$install_path"
 
+    # Create alias symlink
+    echo "Creating alias 'crushbox'..."
+    if [ -L "$alias_path" ] || [ -f "$alias_path" ]; then
+        echo "Removing existing $alias_path..."
+        rm -f "$alias_path"
+    fi
+    ln -s "$install_path" "$alias_path"
+    chmod +x "$alias_path"
+
     echo ""
-    echo "✓ Successfully installed docker-sandbox-crush to $install_path"
+    echo "✓ Successfully installed crush-sandbox to $install_path"
+    echo "✓ Alias 'crushbox' created at $alias_path"
     echo "✓ Docker validated: $(docker --version)"
     echo ""
     echo "Note: gitleaks Docker image will be pulled on first use for credential scanning"
     echo ""
     echo "You can now run:"
-    echo "  docker-sandbox-crush run      # Start Crush CLI in sandbox"
-    echo "  docker-sandbox-crush clean    # Remove sandbox for current workspace"
-    echo "  docker-sandbox-crush update   # Update to latest version"
+    echo "  crush-sandbox run      # Start Crush CLI in sandbox"
+    echo "  crushbox run           # Alias: same as crush-sandbox run"
+    echo "  crush-sandbox clean    # Remove sandbox for current workspace"
+    echo "  crush-sandbox update   # Update to latest version"
     echo ""
     echo "For more information, run:"
-    echo "  docker-sandbox-crush --help"
+    echo "  crush-sandbox --help"
 }
 
 update_command() {
@@ -735,7 +747,7 @@ update_command() {
 
     # Replace current script with updated version
     echo ""
-    echo "Updating docker-sandbox-crush..."
+    echo "Updating crush-sandbox..."
     if ! mv "$temp_file" "$script_path"; then
         echo "Error: Failed to update script. Try running with sudo." >&2
         rm -f "$temp_file"
@@ -750,7 +762,7 @@ update_command() {
     echo "  Script location: $script_path"
     echo ""
     echo "Changes since your version:"
-    echo "  View release notes: https://github.com/wireless25/crush-sandbox/releases"
+    echo "View release notes: https://github.com/wireless25/crush-sandbox/releases"
 }
 
 # Main script logic
@@ -809,7 +821,7 @@ done
 
 # Show version and exit if requested
 if [ "$SHOW_VERSION" = "true" ]; then
-    echo "docker-sandbox-crush version $VERSION"
+    echo "crush-sandbox version $VERSION"
     exit 0
 fi
 

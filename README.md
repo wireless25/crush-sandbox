@@ -1,4 +1,4 @@
-# Docker Sandbox Crush
+# Crush Sandbox
 
 A lightweight bash wrapper that runs the [Crush CLI](https://github.com/charmbracelet/crush) in a Docker sandbox with persistent package manager caches. Perfect for isolating your development environment while keeping tools and dependencies cached per workspace.
 
@@ -14,8 +14,9 @@ A lightweight bash wrapper that runs the [Crush CLI](https://github.com/charmbra
 #### One-command installation (recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/wireless25/crush-sandbox/main/docker-sandbox-crush | sudo tee /usr/local/bin/docker-sandbox-crush > /dev/null
-sudo chmod +x /usr/local/bin/docker-sandbox-crush
+curl -fsSL https://raw.githubusercontent.com/wireless25/crush-sandbox/main/docker-sandbox-crush | sudo tee /usr/local/bin/crush-sandbox > /dev/null
+sudo chmod +x /usr/local/bin/crush-sandbox
+ln -s /usr/local/bin/crush-sandbox /usr/local/bin/crushbox
 ```
 
 #### Manual installation
@@ -32,7 +33,7 @@ sudo chmod +x /usr/local/bin/docker-sandbox-crush
 
 3. Move it to your PATH:
    ```bash
-   sudo mv docker-sandbox-crush /usr/local/bin/
+   sudo mv docker-sandbox-crush /usr/local/bin/crush-sandbox
    ```
 
 #### Install using the script itself
@@ -45,7 +46,8 @@ If you've cloned the repository, you can use the built-in install command:
 
 This will:
 - Validate Docker is available
-- Install the script to `/usr/local/bin/docker-sandbox-crush`
+- Install the script to `/usr/local/bin/crush-sandbox`
+- Create a `crushbox` alias symlink
 - Display version information for installed tools
 
 **Note:** gitleaks Docker image will be pulled automatically on first use for credential scanning. No additional installation is required.
@@ -117,7 +119,9 @@ You can control configuration behavior with these flags:
 
 ```bash
 # Skip host configuration
-docker-sandbox-crush run --no-host-config
+crush-sandbox run --no-host-config
+# Or use alias:
+crushbox run --no-host-config
 ```
 
 ### Configuration Directory Structure Example
@@ -138,7 +142,13 @@ If you have a `crush.json` or `.crush.json` already in the workspace root, this 
 Navigate to your workspace directory and run:
 
 ```bash
-docker-sandbox-crush run
+crush-sandbox run
+```
+
+Or use the alias:
+
+```bash
+crushbox run
 ```
 
 This will:
@@ -153,7 +163,13 @@ This will:
 If you need to debug or run manual commands:
 
 ```bash
-docker-sandbox-crush run --shell
+crush-sandbox run --shell
+```
+
+Or with the alias:
+
+```bash
+crushbox run --shell
 ```
 
 This gives you an interactive shell in the sandbox container instead of running Crush CLI.
@@ -163,25 +179,31 @@ This gives you an interactive shell in the sandbox container instead of running 
 To remove the container and cache volume for the current workspace:
 
 ```bash
-docker-sandbox-crush clean
+crush-sandbox clean
+```
+
+Or with the alias:
+
+```bash
+crushbox clean
 ```
 
 Add `--force` to skip confirmation:
 
 ```bash
-docker-sandbox-crush clean --force
+crush-sandbox clean --force
 ```
 
 ### Show version
 
 ```bash
-docker-sandbox-crush --version
+crush-sandbox --version
 ```
 
 ### Update to latest version
 
 ```bash
-docker-sandbox-crush update
+crush-sandbox update
 ```
 
 This will:
@@ -194,7 +216,7 @@ This will:
 ### Get help
 
 ```bash
-docker-sandbox-crush --help
+crush-sandbox --help
 ```
 
 ## 🔒 Security
@@ -311,7 +333,7 @@ The tool implements these security controls:
 
 4. **Credential scanning** - Warns about exposed secrets:
    - Scans workspace with gitleaks before starting
-   - gitleaks is automatically installed when you run `docker-sandbox-crush run --cred-scan`
+   - gitleaks is automatically installed when you run `crush-sandbox run --cred-scan`
    - Prompts you to continue or abort if credentials detected
    - Can be bypassed with `--no-cred-scan` flag (use with caution)
 
@@ -369,7 +391,9 @@ Installation happens automatically and silently on every container start, with f
 cd ~/projects/my-app
 
 # Start Crush CLI in sandbox
-docker-sandbox-crush run
+crush-sandbox run
+# Or use alias:
+# crushbox run
 
 # ... work with Crush CLI ...
 
@@ -381,10 +405,10 @@ docker-sandbox-crush run
 
 ```bash
 cd ~/projects/project-a
-docker-sandbox-crush run  # Uses crush-sandbox-<hash-a>
+crush-sandbox run  # Uses crush-sandbox-<hash-a>
 
 cd ~/projects/project-b
-docker-sandbox-crush run  # Uses crush-sandbox-<hash-b>
+crush-sandbox run  # Uses crush-sandbox-<hash-b>
 ```
 
 Each workspace has its own isolated environment.
@@ -393,7 +417,9 @@ Each workspace has its own isolated environment.
 
 ```bash
 # Get a shell to check installation
-docker-sandbox-crush run --shell
+crush-sandbox run --shell
+# Or:
+crushbox run --shell
 
 # Inside the container:
 which crush          # Check if Crush CLI is installed
@@ -428,7 +454,7 @@ git config --global user.email "your.email@example.com"
 
 **Solution**: Run with `--shell` flag to debug:
 ```bash
-docker-sandbox-crush run --shell
+crush-sandbox run --shell
 # Then manually install:
 npm install -g @charmland/crush
 ```

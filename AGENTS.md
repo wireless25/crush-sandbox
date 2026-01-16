@@ -5,7 +5,8 @@
 This is a minimal bash wrapper script that creates a Docker sandbox environment for running the Crush CLI agent. The tool isolates development work in containers, provides persistent package manager caches per workspace, and automates Crush CLI installation.
 
 **Key characteristics:**
-- Single executable bash script (`docker-sandbox-crush`)
+- Single executable bash script (`docker-sandbox-crush` - installs as `crush-sandbox` command)
+- Alias `crushbox` available after installation
 - macOS-focused (relies on Docker Desktop path mapping)
 - Per-workspace container isolation (one sandbox per workspace directory)
 - Persistent cache volumes for npm/pnpm
@@ -29,11 +30,19 @@ docker-sandbox-crush/
 
 ### Available Commands
 
+**When using the script from the repo:**
 - `./docker-sandbox-crush run` - Start the Crush CLI in a Docker sandbox
 - `./docker-sandbox-crush clean` - Remove the sandbox container and cache volume
 - `./docker-sandbox-crush reset` - Alias for `clean`
-- `./docker-sandbox-crush install` - Install the script to `/usr/local/bin/docker-sandbox-crush`
+- `./docker-sandbox-crush install` - Install the script to `/usr/local/bin/crush-sandbox`
 - `./docker-sandbox-crush update` - Update to the latest version
+
+**After installation:**
+- `crush-sandbox run` - Start the Crush CLI in a Docker sandbox
+- `crushbox run` - Alias for `crush-sandbox run`
+- `crush-sandbox clean` - Remove the sandbox container and cache volume
+- `crush-sandbox install` - Reinstall or update the script
+- `crush-sandbox update` - Update to the latest version
 
 ### Command Options
 
@@ -46,7 +55,7 @@ docker-sandbox-crush/
 ### Environment Variables
 
 - `DOCKER_SANDBOX_IMAGE` - Override the Docker image (default: `node:22-alpine`)
-- Example: `DOCKER_SANDBOX_IMAGE=node:20-alpine docker-sandbox-crush run`
+- Example: `DOCKER_SANDBOX_IMAGE=node:20-alpine ./docker-sandbox-crush run` or `DOCKER_SANDBOX_IMAGE=node:20-alpine crush-sandbox run`
 
 ## Essential Testing Commands
 

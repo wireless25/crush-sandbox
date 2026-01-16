@@ -1,4 +1,4 @@
-# Contributing to Docker Sandbox Crush
+# Contributing to Crush Sandbox
 
 Thank you for your interest in contributing! We welcome contributions from everyone.
 
@@ -26,7 +26,7 @@ If you find a bug or have a feature request:
 3. Make your changes
 4. Test thoroughly:
    - Run `bash -n docker-sandbox-crush` to check syntax
-   - Test all commands: `run`, `clean`, `install`
+   - Test all commands: `./docker-sandbox-crush run`, `clean`, `install`
    - Test with flags: `--version`, `--shell`, `--force`
 5. Commit your changes with clear messages
 6. Push to your fork:
