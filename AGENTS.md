@@ -345,8 +345,8 @@ Creates a startup script inside the container at `/usr/local/bin/setup-crush-con
 
 ### Cache Configuration
 - **npm cache**: `/workspace-cache/npm` (via `npm_config_cache` env var)
-- **pnpm store**: `/workspace-cache/pnpm/store` (via `NPM_CONFIG_STORE` env var)
-- **pnpm cache**: `/workspace-cache/pnpm/cache` (via `pnpm config set cache-dir`)
+- **pnpm store**: `/workspace-cache/pnpm/store` (via `pnpm config set store-dir` config)
+- **pnpm cache**: `/workspace-cache/pnpm/cache` (via `pnpm config set cache-dir` config)
 
 ### Script Entry Points
 - Main logic in `case` statement at end of script

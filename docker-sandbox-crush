@@ -319,11 +319,6 @@ create_container() {
     # Configure npm cache to use persistent volume
     docker_args+=("-e" "npm_config_cache=/workspace-cache/npm")
 
-    # Configure pnpm cache to use persistent volume
-    # pnpm reads NPM_CONFIG_STORE for store directory
-    docker_args+=("-e" "NPM_CONFIG_STORE=/workspace-cache/pnpm/store")
-    docker_args+=("-e" "npm_config_store=/workspace-cache/pnpm/store")
-
     # Add environment variables for Git config if available
     if [ -n "$git_name" ]; then
         docker_args+=("-e" "GIT_USER_NAME=${git_name}")
@@ -437,13 +432,13 @@ run_container() {
 
     # Display pnpm version if installed
     local pnpm_version
-    pnpm_version=$(docker exec "$container_name" sh -c "if command -v pnpm >/dev/null 2>&1; then pnpm --version; fi" 2>/dev/null || echo "")
+    pnpm_version=$(docker exec "$container_name" sh -c "export PATH=/home/node/.npm-global/bin:\$PATH && if command -v pnpm >/dev/null 2>&1; then pnpm --version; fi" 2>/dev/null || echo "")
     if [ -n "$pnpm_version" ]; then
         echo "pnpm version: $pnpm_version"
     fi
 
-    # Configure pnpm cache directory (if pnpm is installed)
-    docker exec "$container_name" sh -c "if command -v pnpm >/dev/null 2>&1; then pnpm config set cache-dir /workspace-cache/pnpm/cache 2>/dev/null || true; fi" >/dev/null 2>&1
+    # Configure pnpm cache directory and store location (if pnpm is installed)
+    docker exec "$container_name" sh -c "export PATH=/home/node/.npm-global/bin:\$PATH && if command -v pnpm >/dev/null 2>&1; then pnpm config set cache-dir /workspace-cache/pnpm/cache && pnpm config set store-dir /workspace-cache/pnpm/store && echo 'pnpm store configured to:' && pnpm store path; else echo 'pnpm not installed'; fi"
 
     # Execute command in container
     # Build docker exec args
