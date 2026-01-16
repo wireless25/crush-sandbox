@@ -29,6 +29,11 @@ jobs:
           cache: 'pnpm'
           cache-dependency-path: './docs/pnpm-lock.yaml'
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: "10.17.1"
+
       - name: Install dependencies
         run: cd docs && CI=true pnpm install
 
