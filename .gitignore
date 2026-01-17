@@ -11,3 +11,5 @@
 # Local config files (if any)
 .local/
 .env
+
+**/node_modules/
