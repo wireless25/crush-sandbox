@@ -5,7 +5,7 @@ set -e
 VERSION="0.6.0"
 
 # Docker image configuration - can be overridden via DOCKER_SANDBOX_IMAGE environment variable
-DOCKER_IMAGE="${DOCKER_SANDBOX_IMAGE:-node:22-bookworm-slim}"
+DOCKER_IMAGE="${DOCKER_SANDBOX_IMAGE:-node:22-bookworm}"
 
 # Color codes (disabled if NO_COLOR is set or not a TTY)
 if [ -t 0 ] && [ -z "$NO_COLOR" ]; then
