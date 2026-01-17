@@ -2,10 +2,47 @@
 
 set -e
 
-VERSION="0.5.2"
+VERSION="0.6.0"
 
 # Docker image configuration - can be overridden via DOCKER_SANDBOX_IMAGE environment variable
-DOCKER_IMAGE="${DOCKER_SANDBOX_IMAGE:-node:22-alpine}"
+DOCKER_IMAGE="${DOCKER_SANDBOX_IMAGE:-node:22-bookworm-slim}"
+
+# Color codes (disabled if NO_COLOR is set or not a TTY)
+if [ -t 0 ] && [ -z "$NO_COLOR" ]; then
+    GREEN='\033[0;32m'
+    RED='\033[0;31m'
+    YELLOW='\033[1;33m'
+    CYAN='\033[0;36m'
+    GRAY='\033[0;90m'
+    NC='\033[0m'
+else
+    GREEN=''
+    RED=''
+    YELLOW=''
+    CYAN=''
+    GRAY=''
+    NC=''
+fi
+
+print_success() {
+    echo -e "${GREEN}✓${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}✗${NC} $1" >&2
+}
+
+print_warning() {
+    echo -e "${YELLOW}!${NC} $1"
+}
+
+print_info() {
+    echo -e "${CYAN}${1}${NC}"
+}
+
+print_dry_run() {
+    echo -e "${YELLOW}[DRY RUN]${NC} $1"
+}
 
 print_usage() {
     echo "Usage: crush-sandbox <command> [options]"
@@ -15,13 +52,15 @@ print_usage() {
     echo "  clean         Remove the sandbox container for current workspace"
     echo "  install       Install this script to /usr/local/bin"
     echo "  update        Update to the latest version"
+    echo "  uninstall     Remove all docker-sandbox-crush artifacts"
     echo ""
     echo "Options:"
     echo "  --version          Show version information"
-    echo "  --force            Skip confirmation for clean command"
+    echo "  --force            Skip confirmation prompts"
     echo "  --shell            Start interactive shell instead of Crush CLI (for debugging)"
-    echo "  --no-host-config    Skip mounting host Crush config directory"
+    echo "  --no-host-config   Skip mounting host Crush config directory"
     echo "  --cred-scan        Enable credential scanning before starting container"
+    echo "  --dry-run          Preview uninstall actions without executing"
 }
 
 validate_docker() {
@@ -760,6 +799,345 @@ update_command() {
     echo "View release notes: https://github.com/wireless25/crush-sandbox/releases"
 }
 
+uninstall_command() {
+    local dry_run="$1"
+    local force="$2"
+
+    # Track failures for summary
+    local script_failed=false
+    local alias_failed=false
+    local container_failures=()
+    local volume_failures=()
+
+    echo "=== Docker Sandbox Crush Uninstall ==="
+    echo ""
+
+    # Validate Docker is available (even for dry-run, to detect containers)
+    if ! validate_docker; then
+        echo "Error: Docker is required to uninstall containers and volumes" >&2
+        exit 1
+    fi
+
+    # Detect running containers
+    local running_containers
+    running_containers=$(docker ps --filter "name=^crush-sandbox-" --format '{{.Names}}' 2>/dev/null || echo "")
+
+    if [ -n "$running_containers" ]; then
+        local count
+        count=$(echo "$running_containers" | wc -l | tr -d ' ')
+        print_warning "$count running container(s) found:"
+        echo "$running_containers" | while read -r container; do
+            echo "  - $container"
+        done
+        echo ""
+
+        if [ "$dry_run" = "true" ]; then
+            print_dry_run "Would continue with uninstall despite running containers"
+        else
+            read -p "Continue anyway? [y/N] " confirm
+            if [[ ! "$confirm" =~ ^[yY] ]]; then
+                echo "Uninstall cancelled"
+                exit 2
+            fi
+        fi
+    fi
+
+    # Step 1: Remove script
+    local script_paths=("/usr/local/bin/crush-sandbox" "/usr/local/bin/docker-sandbox-crush")
+    local script_to_remove=""
+    for script_path in "${script_paths[@]}"; do
+        if [ -f "$script_path" ]; then
+            script_to_remove="$script_path"
+            break
+        fi
+    done
+
+    if [ -n "$script_to_remove" ]; then
+        print_info "Script: $script_to_remove"
+
+        if [ "$dry_run" = "true" ]; then
+            print_dry_run "Would remove script at $script_to_remove"
+        elif [ "$force" = "true" ]; then
+            if sudo rm -f "$script_to_remove" 2>/dev/null; then
+                print_success "Removed script at $script_to_remove"
+            else
+                print_error "Failed to remove script at $script_to_remove"
+                script_failed=true
+            fi
+        else
+            read -p "Remove script at $script_to_remove? [y/N] " confirm
+            if [[ "$confirm" =~ ^[yY] ]]; then
+                if sudo rm -f "$script_to_remove" 2>/dev/null; then
+                    print_success "Removed script at $script_to_remove"
+                else
+                    print_error "Failed to remove script at $script_to_remove"
+                    script_failed=true
+                fi
+            else
+                echo "Skipped script removal"
+            fi
+        fi
+    else
+        echo "No script found (expected at /usr/local/bin/crush-sandbox or /usr/local/bin/docker-sandbox-crush)"
+    fi
+
+    echo ""
+
+    # Step 2: Remove alias
+    local alias_path="/usr/local/bin/crushbox"
+    if [ -f "$alias_path" ] || [ -L "$alias_path" ]; then
+        print_info "Alias: $alias_path"
+
+        if [ "$dry_run" = "true" ]; then
+            print_dry_run "Would remove alias at $alias_path"
+        elif [ "$force" = "true" ]; then
+            if sudo rm -f "$alias_path" 2>/dev/null; then
+                print_success "Removed alias at $alias_path"
+            else
+                print_error "Failed to remove alias at $alias_path"
+                alias_failed=true
+            fi
+        else
+            read -p "Remove alias at $alias_path? [y/N] " confirm
+            if [[ "$confirm" =~ ^[yY] ]]; then
+                if sudo rm -f "$alias_path" 2>/dev/null; then
+                    print_success "Removed alias at $alias_path"
+                else
+                    print_error "Failed to remove alias at $alias_path"
+                    alias_failed=true
+                fi
+            else
+                echo "Skipped alias removal"
+            fi
+        fi
+    else
+        echo "No alias found at $alias_path"
+    fi
+
+    echo ""
+
+    # Step 3: Remove containers
+    local containers
+    containers=$(docker ps -a --filter "name=^crush-sandbox-" --format '{{.Names}}' 2>/dev/null || echo "")
+
+    if [ -n "$containers" ]; then
+        local container_count
+        container_count=$(echo "$containers" | wc -l | tr -d ' ')
+        echo "Found $container_count container(s):"
+
+        # Use a different approach to avoid subshell issues
+        while IFS= read -r container; do
+            local status
+            status=$(docker inspect --format '{{.State.Status}}' "$container" 2>/dev/null || echo "unknown")
+            echo "  - $container ($status)"
+        done <<< "$containers"
+
+        if [ "$dry_run" = "true" ]; then
+            print_dry_run "Would remove $container_count container(s)"
+            echo ""
+        elif [ "$force" = "true" ] || [[ "$(read -p "Remove $container_count container(s)? [y/N] " confirm; echo "$confirm")" =~ ^[yY] ]]; then
+            if [ "$force" != "true" ]; then
+                read -p "Remove $container_count container(s)? [y/N] " confirm
+                if [[ ! "$confirm" =~ ^[yY] ]]; then
+                    echo "Skipped container removal"
+                else
+                    echo ""
+                fi
+            else
+                echo ""
+            fi
+
+            if [ "$force" = "true" ] || [[ "$confirm" =~ ^[yY] ]]; then
+                local i=1
+                while IFS= read -r container; do
+                    echo -n "[$i/$container_count] Removing container $container... "
+                    if docker stop "$container" >/dev/null 2>&1; then
+                        if docker rm "$container" >/dev/null 2>&1; then
+                            print_success "Removed $container"
+                        else
+                            print_error "Failed to remove $container (stop succeeded)"
+                            container_failures+=("Failed to remove $container")
+                        fi
+                    else
+                        print_error "Failed to stop $container"
+                        container_failures+=("Failed to stop $container")
+                    fi
+                    i=$((i + 1))
+                done <<< "$containers"
+            fi
+        else
+            echo "Skipped container removal"
+        fi
+    else
+        echo "No containers found"
+    fi
+
+    echo ""
+
+    # Step 4: Remove volumes
+    local volumes
+    volumes=$(docker volume ls --filter "name=^crush-cache-" --format '{{.Name}}' 2>/dev/null || echo "")
+
+    if [ -n "$volumes" ]; then
+        local volume_count
+        volume_count=$(echo "$volumes" | wc -l | tr -d ' ')
+        echo "Found $volume_count volume(s):"
+
+        # Use a different approach to avoid subshell issues
+        while IFS= read -r volume; do
+            local size
+            size=$(docker volume inspect --format '{{.UsageData.Size}}' "$volume" 2>/dev/null || echo "unknown")
+            echo "  - $volume ($size)"
+        done <<< "$volumes"
+
+        if [ "$dry_run" = "true" ]; then
+            print_dry_run "Would remove $volume_count volume(s)"
+            echo ""
+        elif [ "$force" = "true" ] || [[ "$(read -p "Remove $volume_count volume(s)? [y/N] " confirm; echo "$confirm")" =~ ^[yY] ]]; then
+            if [ "$force" != "true" ]; then
+                read -p "Remove $volume_count volume(s)? [y/N] " confirm
+                if [[ ! "$confirm" =~ ^[yY] ]]; then
+                    echo "Skipped volume removal"
+                else
+                    echo ""
+                fi
+            else
+                echo ""
+            fi
+
+            if [ "$force" = "true" ] || [[ "$confirm" =~ ^[yY] ]]; then
+                local i=1
+                while IFS= read -r volume; do
+                    echo -n "[$i/$volume_count] Removing volume $volume... "
+                    if docker volume rm "$volume" >/dev/null 2>&1; then
+                        print_success "Removed $volume"
+                    else
+                        print_error "Failed to remove $volume"
+                        volume_failures+=("Failed to remove $volume")
+                    fi
+                    i=$((i + 1))
+                done <<< "$volumes"
+            fi
+        else
+            echo "Skipped volume removal"
+        fi
+    else
+        echo "No volumes found"
+    fi
+
+    echo ""
+
+    # Final summary
+    echo "=== Uninstall Summary ==="
+
+    # Script status
+    if [ -n "$script_to_remove" ]; then
+        if [ "$dry_run" = "true" ]; then
+            echo -e "Script: ${YELLOW}[DRY RUN]${NC} Would remove $script_to_remove"
+        elif [ "$script_failed" = "true" ]; then
+            echo -e "Script: ${RED}✗ Failed${NC}"
+        else
+            echo -e "Script: ${GREEN}✓ Removed${NC}"
+        fi
+    else
+        echo -e "Script: ${GRAY}N/A${NC} (not installed)"
+    fi
+
+    # Alias status
+    if [ -f "$alias_path" ] || [ -L "$alias_path" ]; then
+        if [ "$dry_run" = "true" ]; then
+            echo -e "Alias: ${YELLOW}[DRY RUN]${NC} Would remove $alias_path"
+        elif [ "$alias_failed" = "true" ]; then
+            echo -e "Alias: ${RED}✗ Failed${NC}"
+        else
+            echo -e "Alias: ${GREEN}✓ Removed${NC}"
+        fi
+    else
+        echo -e "Alias: ${GRAY}N/A${NC} (not installed)"
+    fi
+
+    # Containers status
+    if [ -n "$containers" ]; then
+        local total_containers
+        total_containers=$(echo "$containers" | wc -l | tr -d ' ')
+        local container_fail_count
+        if [ "$dry_run" = "true" ]; then
+            container_fail_count=0
+            echo -e "Containers: ${YELLOW}[DRY RUN]${NC} Would remove $total_containers container(s)"
+        else
+            container_fail_count=${#container_failures[@]}
+            if [ $container_fail_count -eq 0 ]; then
+                echo -e "Containers: ${GREEN}✓ Removed all${NC} ($total_containers)"
+            else
+                echo -e "Containers: ${RED}✗ Partially failed${NC} ($container_fail_count/$total_containers failed)"
+            fi
+        fi
+    else
+        echo -e "Containers: ${GRAY}N/A${NC} (none found)"
+    fi
+
+    # Volumes status
+    if [ -n "$volumes" ]; then
+        local total_volumes
+        total_volumes=$(echo "$volumes" | wc -l | tr -d ' ')
+        local volume_fail_count
+        if [ "$dry_run" = "true" ]; then
+            volume_fail_count=0
+            echo -e "Volumes: ${YELLOW}[DRY RUN]${NC} Would remove $total_volumes volume(s)"
+        else
+            volume_fail_count=${#volume_failures[@]}
+            if [ $volume_fail_count -eq 0 ]; then
+                echo -e "Volumes: ${GREEN}✓ Removed all${NC} ($total_volumes)"
+            else
+                echo -e "Volumes: ${RED}✗ Partially failed${NC} ($volume_fail_count/$total_volumes failed)"
+            fi
+        fi
+    else
+        echo -e "Volumes: ${GRAY}N/A${NC} (none found)"
+    fi
+
+    # Error details
+    if [ "$dry_run" != "true" ]; then
+        local total_errors=0
+        [ "$script_failed" = "true" ] && total_errors=$((total_errors + 1))
+        [ "$alias_failed" = "true" ] && total_errors=$((total_errors + 1))
+        total_errors=$((total_errors + ${#container_failures[@]} + ${#volume_failures[@]}))
+
+        if [ $total_errors -gt 0 ]; then
+            echo ""
+            echo "=== Errors ==="
+
+            if [ "$script_failed" = "true" ]; then
+                echo -e "  ${RED}✗${NC} Script: Failed to remove"
+            fi
+
+            if [ "$alias_failed" = "true" ]; then
+                echo -e "  ${RED}✗${NC} Alias: Failed to remove"
+            fi
+
+            for failure in "${container_failures[@]}"; do
+                echo -e "  ${RED}✗${NC} Container: $failure"
+            done
+
+            for failure in "${volume_failures[@]}"; do
+                echo -e "  ${RED}✗${NC} Volume: $failure"
+            done
+
+            echo ""
+            echo -e "${RED}Uninstall complete. $total_errors error(s) occurred.${NC}"
+            exit 1
+        else
+            echo ""
+            echo -e "${GREEN}Uninstall complete. All components removed successfully.${NC}"
+            exit 0
+        fi
+    else
+        echo ""
+        echo -e "${YELLOW}[DRY RUN] Uninstall preview complete. No changes made.${NC}"
+        exit 0
+    fi
+}
+
 # Main script logic
 if [ $# -lt 1 ]; then
     print_usage >&2
@@ -773,6 +1151,7 @@ SHELL_MODE="false"
 SHOW_VERSION="false"
 NO_HOST_CONFIG="false"
 CRED_SCAN="false"
+DRY_RUN="false"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -794,6 +1173,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --cred-scan)
             CRED_SCAN="true"
+            shift
+            ;;
+        --dry-run)
+            DRY_RUN="true"
             shift
             ;;
         -*)
@@ -837,6 +1220,9 @@ case "$COMMAND" in
         ;;
     update)
         update_command
+        ;;
+    uninstall)
+        uninstall_command "$DRY_RUN" "$FORCE"
         ;;
     *)
         echo "Error: Unknown command: $COMMAND" >&2
