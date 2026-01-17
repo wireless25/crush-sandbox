@@ -1,6 +1,6 @@
 {
     "name": "crush-sandbox",
-    "version": "0.5.0",
+    "version": "0.5.1",
     "description": "Docker sandbox for the Crush CLI with per-workspace caching",
     "license": "MIT",
     "bin": {
