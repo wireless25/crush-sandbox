@@ -11,7 +11,17 @@ A lightweight bash wrapper that runs the [Crush CLI](https://github.com/charmbra
 
 ### Installation
 
-#### One-command installation (recommended)
+#### npm global install (recommended)
+
+The recommended installation method uses npm to install crush-sandbox globally:
+
+```bash
+npm install -g crush-sandbox
+```
+
+#### Direct script installation
+
+**Automatic installation:**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/wireless25/crush-sandbox/main/docker-sandbox-crush | sudo tee /usr/local/bin/crush-sandbox > /dev/null
@@ -19,7 +29,7 @@ sudo chmod +x /usr/local/bin/crush-sandbox
 ln -s /usr/local/bin/crush-sandbox /usr/local/bin/crushbox
 ```
 
-#### Manual installation
+**Manual installation:**
 
 1. Download the script:
    ```bash
@@ -36,7 +46,7 @@ ln -s /usr/local/bin/crush-sandbox /usr/local/bin/crushbox
    sudo mv docker-sandbox-crush /usr/local/bin/crush-sandbox
    ```
 
-#### Install using the script itself
+**Install using the script itself:**
 
 If you've cloned the repository, you can use the built-in install command:
 
@@ -216,7 +226,7 @@ This will:
 ### Get help
 
 ```bash
-crush-sandbox --help
+crush-sandbox help
 ```
 
 ## 🔒 Security

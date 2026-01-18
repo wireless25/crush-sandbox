@@ -175,7 +175,7 @@ const copyToClipboard = async (code: string, id: string) => {
         </div>
 
         <div class="space-y-8">
-          <!-- Method 1: One-Command -->
+          <!-- Method 1: npm global install (RECOMMENDED) -->
           <div class="border-2 border-[#ffb000] bg-[#0f0a00]">
             <div class="flex items-center gap-3 px-4 py-3 border-b-2 border-[#ffb000] bg-[#ffb000]">
               <span class="text-[#0a0a0a] font-bold text-sm">RECOMMENDED</span>
@@ -183,13 +183,34 @@ const copyToClipboard = async (code: string, id: string) => {
             <div class="p-6">
               <div class="flex items-start justify-between mb-4">
                 <div>
-                  <h3 class="text-xl font-bold text-[#ffb000] mb-2">One-Command Installation</h3>
-                  <p class="text-[#999] text-sm">Fastest way to get started. Single command, done.</p>
+                  <h3 class="text-xl font-bold text-[#ffb000] mb-2">npm global install</h3>
+                  <p class="text-[#999] text-sm">global npm installation for crush-sandbox.</p>
                 </div>
               </div>
 
               <div class="relative group/code">
-                <button 
+                <button
+                  @click="copyToClipboard('npm install -g crush-sandbox', 'npm-global')"
+                  class="absolute top-2 right-2 z-10 p-2 border border-[#333] bg-[#1a1a1a] hover:border-[#ffb000] hover:text-[#ffb000] transition-colors"
+                  aria-label="Copy to clipboard">
+                  <span v-if="copiedCode !== 'npm-global'" class="text-xs">COPY</span>
+                  <span v-else class="text-xs text-green-400">COPIED</span>
+                </button>
+                <div class="bg-[#0a0a0a] border-2 border-[#222] p-4 text-sm font-mono overflow-x-auto">
+                  <code class="text-[#e0e0e0]">npm install -g crush-sandbox</code>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Method 2: One-Command Wrapper Install -->
+          <div class="border-2 border-[#222]">
+            <div class="p-6">
+              <h3 class="text-xl font-bold text-[#e0e0e0] mb-4">Install script (single command)</h3>
+              <p class="text-[#999] text-sm mb-6">Install the crush-sandbox script directly on your system</p>
+
+              <div class="relative group/code">
+                <button
                   @click="copyToClipboard('curl -fsSL https://raw.githubusercontent.com/wireless25/crush-sandbox/main/docker-sandbox-crush | sudo tee /usr/local/bin/crush-sandbox > /dev/null\nsudo chmod +x /usr/local/bin/crush-sandbox\nln -s /usr/local/bin/crush-sandbox /usr/local/bin/crushbox', 'one-cmd')"
                   class="absolute top-2 right-2 z-10 p-2 border border-[#333] bg-[#1a1a1a] hover:border-[#ffb000] hover:text-[#ffb000] transition-colors"
                   aria-label="Copy to clipboard">
@@ -298,6 +319,10 @@ const copyToClipboard = async (code: string, id: string) => {
               <li class="flex items-start gap-3 text-[#e0e0e0]">
                 <span class="text-[#ffb000] mt-1">›</span>
                 <span><strong class="text-[#ffb000]">Docker Desktop</strong> installed and running</span>
+              </li>
+              <li class="flex items-start gap-3 text-[#e0e0e0]">
+                <span class="text-[#ffb000] mt-1">›</span>
+                <span><strong class="text-[#ffb000]">npm</strong> (comes with Node.js, required for npm global install)</span>
               </li>
               <li class="flex items-start gap-3 text-[#e0e0e0]">
                 <span class="text-[#ffb000] mt-1">›</span>
