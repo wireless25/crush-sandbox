@@ -4,7 +4,8 @@
     "description": "Docker sandbox for the Crush CLI with per-workspace caching",
     "license": "MIT",
     "bin": {
-        "crush-sandbox": "docker-sandbox-crush"
+        "crush-sandbox": "docker-sandbox-crush",
+        "crushbox": "docker-sandbox-crush"
     },
     "files": [
         "docker-sandbox-crush",
