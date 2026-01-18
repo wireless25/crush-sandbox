@@ -50,6 +50,7 @@ print_usage() {
     echo "Commands:"
     echo "  run           Run Crush CLI in Docker sandbox"
     echo "  clean         Remove the sandbox container for current workspace"
+    echo "  help          Show this help message"
     echo "  install       Install this script to /usr/local/bin"
     echo "  update        Update to the latest version"
     echo "  uninstall     Remove all docker-sandbox-crush artifacts"
@@ -1214,6 +1215,10 @@ case "$COMMAND" in
         ;;
     clean|reset)
         clean_command "$FORCE"
+        ;;
+    help)
+        print_usage
+        exit 0
         ;;
     install)
         install_command
