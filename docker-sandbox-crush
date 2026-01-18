@@ -397,7 +397,7 @@ fi
 
 # Install Crush CLI via npm global install
 echo "Installing Crush CLI..."
-if npm install -g @charmland/crush >/dev/null 2>&1; then
+if npm install -g @charmland/crush@0.33.3 >/dev/null 2>&1; then
     echo "Crush CLI installed successfully"
     exit 0
 else
