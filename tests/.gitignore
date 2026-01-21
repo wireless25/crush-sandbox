@@ -1,0 +1,10 @@
+# Bats files
+*.bats.log
+
+# Test artifacts
+test-reports/
+coverage/
+
+# Temporary test directories
+tmp/
+temp/

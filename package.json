@@ -1,7 +1,7 @@
 {
     "name": "crush-sandbox",
-    "version": "0.7.1",
-    "description": "Docker sandbox for the Crush CLI with per-workspace caching",
+    "version": "0.8.0",
+    "description": "Docker sandbox for the Crush CLI with Git worktree support",
     "license": "MIT",
     "bin": {
         "crush-sandbox": "docker-sandbox-crush",
@@ -17,5 +17,9 @@
         "type": "git",
         "url": "https://github.com/wireless25/crush-sandbox.git"
     },
-    "packageManager": "pnpm@10.28.0"
+    "packageManager": "pnpm@10.28.0",
+    "scripts": {
+        "test": "bats tests/",
+        "test:verbose": "bats -v tests/"
+    }
 }

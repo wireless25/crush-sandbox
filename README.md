@@ -1,6 +1,6 @@
 # Crush Sandbox
 
-A lightweight bash wrapper that runs the [Crush CLI](https://github.com/charmbracelet/crush) in a Docker sandbox with persistent package manager caches. Perfect for isolating your development environment while keeping tools and dependencies cached per workspace.
+A lightweight bash wrapper that runs the [Crush CLI](https://github.com/charmbracelet/crush) in a Docker sandbox with **Git worktree support**. Perfect for AI-assisted development across multiple branches simultaneously, with per-workspace persistent caching for fast builds.
 
 ## 🚀 Quick Start
 
@@ -63,14 +63,108 @@ This will:
 **Note:** gitleaks Docker image will be pulled automatically on first use for credential scanning. No additional installation is required.
 
 ## ✨ Features
-
-- **Workspace isolation**: Each workspace directory gets its own sandbox container
-- **Persistent caches**: npm and pnpm caches persist per workspace for faster subsequent runs
+- **Git worktree support** - Work on multiple branches simultaneously without git conflicts
+- **Per-worktree container isolation**: Each worktree (main + each worktree) gets its own container for crash isolation
+- **Shared cache volumes**: All worktrees in same repository share a cache volume for fast installs
+- **Workspace path mounting**: Your workspace is mounted at same absolute path inside container, makes debugging easier
+- **Persistent caches**: npm and pnpm caches persist per repository for faster subsequent runs
 - **Automatic Crush CLI installation**: Crush CLI is installed automatically on first use
 - **Git config injection**: Your Git user.name and user.email are passed into the container
 - **Container reuse**: Containers are stopped but not removed, enabling fast restarts
-- **Debugging support**: Use `--shell` flag to get an interactive shell instead of Crush CLI
+- **Container shell**: Use `--shell` flag to get an interactive shell instead of Crush CLI
 - **Configuration support**: Automatically mounts and merges Crush configuration from host
+
+## 🌳 Git Worktrees
+
+Git worktrees allow you to check out multiple branches simultaneously in different directories.
+
+### Why Worktrees Matter for AI Development
+
+Traditional git workflow forces you to switch branches (`git checkout`) to work on different features. This means:
+- You can only work on one feature at a time
+- Stashing or committing work-in-progress to switch contexts
+- Crush CLI can only work on the current branch
+- Slow context switching between features
+
+With git worktrees:
+- **Work on multiple branches simultaneously** - Each worktree is an isolated directory on a different branch
+- **No context switching** - Jump between worktrees instantly, no stashing or committing needed
+- **Perfect for AI agents** - Crush can generate code in one worktree while you review in another
+- **Isolated environments** - Each worktree has its own docker container, sharing one cache volume with all containers in the same repository
+
+### Worktree Structure
+
+```
+my-project/                    # Main workspace (e.g., main branch)
+├── src/
+├── .worktrees/               # Worktree directory
+│   ├── feature-login/        # Worktree 1 (feature/login branch)
+│   │   ├── src/
+│   │   └── package.json
+│   ├── fix-bug-123/         # Worktree 2 (bugfix/123 branch)
+│   │   ├── src/
+│   │   └── package.json
+│   └── experiment-api/       # Worktree 3 (experiment/api branch)
+│       ├── src/
+│       └── package.json
+└── package.json
+```
+
+Each worktree is a **separate Crush sandbox** with its own isolated container (crash-safe) but shares the npm/pnpm cache volume with other worktrees in the same repository.
+
+### Crush Sandbox + Worktrees Workflow
+
+1. **Create worktree**: `crush-sandbox run --worktree feature-login`
+2. **Work in isolation**: Crush CLI runs in `my-project/.worktrees/feature-login/` with its own container
+3. **Generate code**: AI creates feature code in worktree
+4. **Switch workspace**: `cd ../fix-bug-123` (instant, no git operations, each has its own container)
+5. **Review later**: Come back to worktree anytime, work is preserved
+6. **List containers**: `crush-sandbox list-containers` to see all workspace containers
+7. **Clean up**: `crush-sandbox remove-worktree feature-login` when done (also removes its container)
+8. **Restart**: Run a worktree sandbox later with `crush-sandbox run --worktree feature-login` (existing worktree name restarts the container) or `cd .worktrees/feature-login` and `crush-sandbox run`
+
+### Comparison: Traditional vs Worktree
+
+| Task | Traditional Git | With Worktrees |
+|------|-----------------|----------------|
+| Work on 2 features | Stash/commit, checkout branch | `cd .worktrees/feature2` |
+| AI code review | Push PR, review in same repo | Generate in worktree, review in main |
+| Context switch | 30-60 seconds | <1 second |
+| Uncommitted changes | Must stash or commit | Stay in worktree |
+| Parallel testing | Difficult | Easy (each worktree has its own sandbox) |
+
+### Worktree Commands
+
+**Create a new worktree with auto-generated name:**
+```bash
+crush-sandbox run --worktree
+```
+
+**Create worktree with custom name:**
+```bash
+crush-sandbox run --worktree feature-login
+```
+
+**List all worktrees:**
+```bash
+crush-sandbox list-worktrees
+```
+
+**List all containers:**
+```bash
+crush-sandbox list-containers
+```
+This shows all containers for the repository (main + all worktrees) with their status (running/stopped) and current workspace indicator.
+
+**Remove a worktree:**
+```bash
+crush-sandbox remove-worktree feature-login
+```
+
+**Force remove (with uncommitted changes):**
+```bash
+crush-sandbox remove-worktree feature-login --force
+```
 
 ## ⚙️ Configuration
 
@@ -198,7 +292,7 @@ Or with the alias:
 crushbox clean
 ```
 
-Add `--force` to skip confirmation:
+Add `--force` to skip prompts and clean all containers + cache:
 
 ```bash
 crush-sandbox clean --force
@@ -356,11 +450,14 @@ The tool implements these security controls:
 
 ### Workspace Isolation
 
-Each workspace directory (your current working directory) gets its own:
-- **Container**: Named `crush-sandbox-<hash>` where `<hash>` is derived from your workspace path
-- **Cache volume**: Named `crush-cache-<hash>` for persistent package manager caches
+Each workspace directory (main or worktree) gets its own:
+- **Container**: Named `crush-sandbox-<repo-hash>` (main) or `crush-sandbox-<repo-hash>-<worktree-name>` (worktree)
+- **Cache volume**: Named `crush-cache-<repo-hash>` for persistent package manager caches (shared across all worktrees in same repository)
 
-This means different projects have completely isolated sandbox environments.
+This means:
+- Each worktree has crash isolation (stopping one doesn't affect others)
+- All worktrees in same repository share npm/pnpm cache for fast installs
+- Different repositories have completely isolated sandbox environments
 
 ### Container Lifecycle
 
@@ -394,8 +491,127 @@ Installation happens automatically and silently on every container start, with f
 
 ## 📋 Examples
 
-### Typical workflow
+### Worktree Examples
 
+#### Example 1: Feature Development Workflow
+```bash
+# Navigate to your project
+cd ~/projects/my-app
+
+# Create worktree for new feature
+crush-sandbox run --worktree feature-auth
+
+# Inside Crush CLI, generate authentication code
+> Crush: Implement JWT authentication
+[AI generates auth system in .worktrees/feature-auth/]
+
+# Switch back to main workspace
+cd ~/projects/my-app
+
+# Continue working on main branch
+git pull origin main
+
+# Later, review the worktree
+cd .worktrees/feature-auth
+git diff main  # See all changes from worktree
+
+# When satisfied, merge to main
+git checkout main
+git merge feature-auth
+crush-sandbox remove-worktree feature-auth
+```
+
+#### Example 2: Parallel Development
+```bash
+# Main workspace: stable branch
+cd ~/projects/my-app
+
+# Worktree 1: User profile feature
+crush-sandbox run --worktree feature-profile
+# AI generates user profile code
+
+# Worktree 2: API refactoring
+cd ~/projects/my-app
+crush-sandbox run --worktree refactor-api
+# AI refactors API endpoints
+
+# Worktree 3: Bugfix
+cd ~/projects/my-app
+crush-sandbox run --worktree fix-auth-bug
+# AI fixes authentication bug
+
+# List all worktrees
+crush-sandbox list-worktrees
+
+# Worktrees:
+#   - /Users/user/projects/my-app/.worktrees/feature-profile
+#     Branch: feature/profile
+#   - /Users/user/projects/my-app/.worktrees/refactor-api (current)
+#     Branch: refactor/api
+#   - /Users/user/projects/my-app/.worktrees/fix-auth-bug
+#     Branch: fix/auth-bug
+
+# Switch between worktrees instantly (no git checkout needed)
+cd ../feature-profile
+cd ../fix-auth-bug
+```
+
+#### Example 3: Bugfix vs Feature Isolation
+```bash
+# Main workspace on stable branch (production code)
+cd ~/projects/my-app
+git checkout main
+
+# Worktree for urgent bugfix (isolated from feature work)
+crush-sandbox run --worktree fix-critical-bug
+> Crush: Fix the production authentication bug
+[AI generates bugfix in isolation]
+
+# Meanwhile, main workspace remains stable
+# No risk of accidentally including untested changes
+
+# Test bugfix in its own sandbox
+cd .worktrees/fix-critical-bug
+npm test  # Run tests in bugfix environment
+
+# Merge only when ready
+git checkout main
+git merge fix-critical-bug
+crush-sandbox remove-worktree fix-critical-bug
+```
+
+#### Example 4: AI-Assisted PR Workflow
+```bash
+# Worktree for Crush-generated PR
+cd ~/projects/my-app
+crush-sandbox run --worktree pr-add-dashboard
+
+# Crush generates complete feature
+> Crush: Add admin dashboard with charts and analytics
+[AI creates entire feature in worktree]
+
+# Stay in main workspace to review
+cd ~/projects/my-app
+
+# Compare worktree to main
+git diff main .worktrees/pr-add-dashboard/
+
+# Test worktree changes
+cd .worktrees/pr-add-dashboard
+crush-sandbox run --shell  # Debug in worktree sandbox
+npm test                   # Run tests
+
+# Review and merge
+cd ~/projects/my-app
+git checkout -b add-dashboard
+git merge pr-add-dashboard
+git push origin add-dashboard
+crush-sandbox remove-worktree pr-add-dashboard
+```
+
+### Basic Usage Examples
+
+#### Typical workflow
 ```bash
 # Navigate to your project
 cd ~/projects/my-app
@@ -411,8 +627,7 @@ crush-sandbox run
 # Next time, container is reused (instant start)
 ```
 
-### Using with different workspaces
-
+#### Using with different workspaces
 ```bash
 cd ~/projects/project-a
 crush-sandbox run  # Uses crush-sandbox-<hash-a>
@@ -423,8 +638,7 @@ crush-sandbox run  # Uses crush-sandbox-<hash-b>
 
 Each workspace has its own isolated environment.
 
-### Debugging setup issues
-
+#### Debugging setup issues
 ```bash
 # Get a shell to check installation
 crush-sandbox run --shell
@@ -500,12 +714,66 @@ Or choose a different installation directory in your PATH.
 
 **Solution**: Ensure you're in the same workspace directory. Container names are based on the current working directory (`pwd`).
 
-## 📝 License
+### "Not in a git repository" when using --worktree
 
+**Problem**: Tried to use worktree features outside a git repository.
+
+**Solution**: Worktrees only work in git repositories. Initialize git first:
+```bash
+git init
+```
+
+### Worktree directory not found
+
+**Problem**: Container starts but worktree path doesn't exist.
+
+**Solution**: Check `.worktrees/` directory in git root:
+```bash
+ls -la .worktrees/
+```
+
+If missing, create a new worktree:
+```bash
+crush-sandbox run --worktree my-feature
+```
+
+### Cannot remove worktree with uncommitted changes
+
+**Problem**: Worktree has uncommitted changes and `remove-worktree` fails.
+
+**Solution**: Use `--force` flag:
+```bash
+crush-sandbox remove-worktree my-feature --force
+```
+
+Or commit/stash changes first:
+```bash
+cd .worktrees/my-feature
+git add .
+git commit -m "Save work"
+cd ..
+crush-sandbox remove-worktree my-feature
+```
+
+### Container/volume mismatch with worktree
+
+**Problem**: Container uses root workspace name instead of worktree name.
+
+**Solution**: This is expected behavior! Containers and caches are named based on the **root git workspace**, not the current worktree path. All worktrees in the same project share the same container and cache. This is intentional - it allows fast switching between worktrees without recreating containers.
+
+### Branch conflicts when creating worktree
+
+**Problem**: Git error "Branch already checked out elsewhere" when creating worktree.
+
+**Solution**: The branch is already checked out in another worktree or the main workspace. Either:
+- Use a different branch: `crush-sandbox run --worktree feature2 other-branch`
+- Switch main workspace to a different branch first
+- Remove the worktree that has the branch: `crush-sandbox remove-worktree other-worktree`
+
+## 📝 License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🤝 Contributing
-
 Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 🙋 Support
