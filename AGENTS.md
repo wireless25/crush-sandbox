@@ -60,6 +60,8 @@ docker-sandbox-crush/
 - `--version` - Show version information
 - `--force` - Skip confirmation prompts (use with `clean` and `remove-worktree` commands)
 - `--shell` - Start an interactive shell instead of Crush CLI (for debugging)
+- `--quiet` - Suppress container setup messages in programmatic mode
+- `-p "prompt"` - Send prompt directly to Crush CLI (programmatic mode)
 - `--no-host-config` - Skip mounting host Crush config directory
 - `--cred-scan` - Enable credential scanning before starting container
 - `--worktree [name]` - Create a worktree with optional name, then start Crush CLI in it (blank input uses worktree name as branch name)
@@ -481,6 +483,98 @@ All branch validation is handled by git:
 
 No additional sanitization is performed beyond what git provides.
 
+### Programmatic Mode
+
+**Overview**: Programmatic mode enables automation and CI/CD pipeline integration by sending prompts directly to Crush CLI without interactive sessions.
+
+**Detection**: Programmatic mode is automatically enabled when:
+- `-p "prompt"` flag is provided (explicit prompt)
+- Stdin has piped input (e.g., `echo "prompt" | crush-sandbox run`)
+
+**Priority**: If both `-p` flag and piped input are present, `-p` value is used (explicit wins).
+
+**Docker execution**: Programmatic mode uses `docker exec -i` (no `-t`, not interactive). Crush CLI output is always visible to user.
+
+**Exit codes**: Crush CLI exit codes propagate to script exit for automation scripts.
+
+**Flag conflicts**: The `--shell` flag cannot be used with programmatic mode (`-p` flag or piped input). Error message: "Error: --shell flag cannot be used with -p or piped input".
+
+**Empty prompts**: Empty prompts pass through to Crush CLI without validation. Let Crush CLI handle empty prompt.
+
+**Multi-line support**: Works with:
+- `-p` flag with quoted strings (preserves newlines)
+- Heredocs with `-p` flag
+- Piped multi-line input
+
+**Quiet mode**: `--quiet` flag suppresses container setup messages in programmatic mode:
+- "Starting container..."
+- "Setting up Crush CLI..."
+- "Setup Crush configuration..."
+- "Installing pnpm..."
+- "pnpm installed"
+- "npm version: X"
+- "pnpm version: X"
+- "pnpm store configured to: /workspace-cache/pnpm/store"
+- "Starting Crush CLI..."
+- "Stopping container..."
+- "Container stopped"
+
+Crush CLI output is always visible. Error messages always appear even in quiet mode. `--quiet` only applies to programmatic mode, not interactive mode.
+
+**Usage Examples**:
+```bash
+# Simple prompt with -p flag
+crush-sandbox run -p "Create a REST API with authentication"
+
+# Piped input
+echo "Add error handling to login function" | crush-sandbox run
+
+# Multi-line prompt with -p flag
+crush-sandbox run -p "Create a REST API with:
+- GET /users
+- POST /users
+- DELETE /users/:id"
+
+# Heredoc with -p flag
+crush-sandbox run -p "$(cat <<EOF
+Create a login form with:
+- Email field
+- Password field
+- Remember me checkbox
+- Login button
+EOF
+)"
+
+# With quiet flag
+crush-sandbox run -p "Refactor code" --quiet
+
+# With worktree
+crush-sandbox run --worktree feature-auth -p "Add OAuth login"
+
+# CI/CD pipeline
+#!/bin/bash
+crush-sandbox run -p "Add unit tests for user authentication" --quiet
+npm test
+git add .
+git commit -m "Add auth unit tests"
+git push origin main
+
+# Generate multiple components
+for component in Button Input Modal; do
+  crush-sandbox run -p "Create a React ${component} component" --quiet
+done
+
+# Multi-line piped input
+echo -e "Fix login bug\nAdd validation\nUpdate tests" | crush-sandbox run
+
+# Heredoc piped input
+crush-sandbox run <<EOF
+Create a login form with:
+- Email field
+- Password field
+EOF
+```
+
 ## Important Gotchas
 
 ### Workspace Path Mapping
@@ -622,6 +716,7 @@ No additional sanitization is performed beyond what git provides.
 | `prd-crush-config.md` | ✅ Complete (all acceptance criteria checked) |
 | `prd-worktree-container-isolation.md` | ✅ Complete (all acceptance criteria checked) |
 | `prd-worktree-branch-handling.md` | ✅ Complete (all acceptance criteria checked) |
+| `prd-programmatic-mode.md` | ✅ Complete (all acceptance criteria checked) |
 
 ## Usage Examples
 
@@ -693,6 +788,56 @@ yes "" | ./docker-sandbox-crush run --worktree auto-branch
 
 # CI/CD example: create worktree from environment variable
 ./docker-sandbox-crush run --worktree ci-"$BUILD_ID" --branch-name "$CI_BRANCH"
+```
+
+### Programmatic Mode Usage
+```bash
+# Simple prompt with -p flag
+crush-sandbox run -p "Create a REST API with authentication"
+
+# Piped input
+echo "Add error handling to login function" | crush-sandbox run
+
+# Multi-line prompt with -p flag
+crush-sandbox run -p "Create a REST API with:
+- GET /users
+- POST /users
+- DELETE /users/:id"
+
+# Heredoc with -p flag
+crush-sandbox run -p "$(cat <<EOF
+Create a login form with:
+- Email field
+- Password field
+- Remember me checkbox
+- Login button
+EOF
+)"
+
+# With quiet flag
+crush-sandbox run -p "Refactor code" --quiet
+
+# With worktree
+crush-sandbox run --worktree feature-auth -p "Add OAuth login"
+
+# CI/CD pipeline
+#!/bin/bash
+crush-sandbox run -p "Add unit tests for user authentication" --quiet
+npm test
+git add .
+git commit -m "Add auth unit tests"
+git push origin main
+
+# Generate multiple components in sequence
+for component in Button Input Modal; do
+  crush-sandbox run -p "Create a React ${component} component" --quiet
+done
+
+# Multi-line piped input
+echo -e "Fix login bug\nAdd validation\nUpdate tests" | crush-sandbox run
+
+# Quiet mode with piping
+echo "Refactor code" | crush-sandbox run --quiet
 ```
 
 ### Parallel Worktree Usage
@@ -869,3 +1014,9 @@ From `prd-distribution-and-docs.md`:
 - Each worktree has its own isolated container
 - You can run `crush-sandbox run` in different worktree directories simultaneously
 - Use `crush-sandbox list-containers` to see all running containers
+
+### Programmatic Mode: "--shell flag cannot be used with -p or piped input"
+- The `--shell` flag is incompatible with programmatic mode
+- Programmatic mode is enabled when `-p` flag is used or when stdin has piped input
+- Error message: "Error: --shell flag cannot be used with -p or piped input"
+- Solution: Remove `--shell` flag when using `-p` or piped input, or remove `-p`/piped input when using `--shell`

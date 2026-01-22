@@ -73,6 +73,7 @@ This will:
 - **Container reuse**: Containers are stopped but not removed, enabling fast restarts
 - **Container shell**: Use `--shell` flag to get an interactive shell instead of Crush CLI
 - **Configuration support**: Automatically mounts and merges Crush configuration from host
+- **Programmatic mode**: Send prompts directly via `-p` flag or piped input for automation and CI/CD
 
 ## 🌳 Git Worktrees
 
@@ -262,6 +263,65 @@ This will:
 4. Install pnpm for package management
 5. Start the Crush CLI
 
+### Programmatic Mode
+
+For automation and CI/CD pipelines, you can send prompts directly without interactive mode:
+
+**Using `-p` flag:**
+```bash
+crush-sandbox run -p "Create a REST API with authentication"
+```
+
+**Using piped input:**
+```bash
+cat "./ralph/prompt.md" | crush-sandbox run
+```
+
+**Using heredocs:**
+```bash
+crush-sandbox run -p "$(cat <<EOF
+Create a login form with:
+- Email field
+- Password field
+- Remember me checkbox
+- Login button
+EOF
+)"
+```
+
+**With `--quiet` flag (suppresses container setup messages):**
+```bash
+crush-sandbox run -p "Refactor code" --quiet
+```
+
+**With worktree:**
+```bash
+crush-sandbox run --worktree feature-auth -p "Add OAuth login"
+```
+
+#### Programmatic Mode Details
+
+**Detection**: Programmatic mode is automatically enabled when:
+- `-p "prompt"` flag is provided (explicit prompt)
+- Stdin has piped input (e.g., `echo "prompt" | crush-sandbox run`)
+
+**Priority**: If both `-p` flag and piped input are present, the `-p` value is used (explicit wins).
+
+**Empty prompts**: Empty prompts pass through to Crush CLI without validation. Let Crush CLI handle the empty prompt.
+
+**Multi-line support**: Works with:
+- `-p` flag with quoted strings (preserves newlines)
+- Heredocs with `-p` flag
+- Piped multi-line input
+
+**Quiet mode**: `--quiet` flag suppresses container setup messages in programmatic mode:
+
+Crush CLI output is always visible. Error messages always appear even in quiet mode.
+
+**Flag conflicts**: The `--shell` flag cannot be used with programmatic mode (`-p` flag or piped input).
+
+**Exit codes**: Crush CLI exit codes propagate to script exit for automation scripts.
+
 ### Start a debug shell
 
 If you need to debug or run manual commands:
@@ -277,6 +337,8 @@ crushbox run --shell
 ```
 
 This gives you an interactive shell in the sandbox container instead of running Crush CLI.
+
+**Note:** The `--shell` flag cannot be used with `-p` flag or piped input (programmatic mode).
 
 ### Clean up the sandbox
 
@@ -303,6 +365,20 @@ crush-sandbox clean --force
 ```bash
 crush-sandbox --version
 ```
+
+### Command Options
+
+| Option | Description |
+|--------|-------------|
+| `-p "prompt"` | Send prompt directly to Crush CLI (programmatic mode) |
+| `--quiet` | Suppress container setup messages in programmatic mode |
+| `--shell` | Start interactive shell instead of Crush CLI (for debugging) |
+| `--worktree [name]` | Create a worktree with optional name |
+| `--branch-name [name]` | Specify branch name for worktree (requires --worktree) |
+| `--no-host-config` | Skip mounting host Crush config directory |
+| `--cred-scan` | Enable credential scanning before starting container |
+| `--force` | Skip confirmation prompts (use with clean and remove-worktree) |
+| `--version` | Show version information |
 
 ### Update to latest version
 
@@ -607,6 +683,89 @@ git checkout -b add-dashboard
 git merge pr-add-dashboard
 git push origin add-dashboard
 crush-sandbox remove-worktree pr-add-dashboard
+```
+
+### Programmatic Mode Examples
+
+#### Simple one-liners
+```bash
+# Generate a component
+crush-sandbox run -p "Create a React button component with hover states"
+
+# Add a feature
+echo "Add dark mode support" | crush-sandbox run
+
+# Fix a bug
+crush-sandbox run -p "Fix the authentication redirect loop"
+```
+
+#### CI/CD Pipeline Integration
+```bash
+#!/bin/bash
+# CI/CD pipeline script
+
+# Run automated code generation
+crush-sandbox run -p "Add unit tests for user authentication" --quiet
+
+# Run tests
+npm test
+
+# If tests pass, commit and push
+git add .
+git commit -m "Add auth unit tests"
+git push origin main
+```
+
+#### Multi-command automation
+```bash
+# Generate multiple components in sequence
+for component in Button Input Modal; do
+  crush-sandbox run -p "Create a React ${component} component" --quiet
+done
+```
+
+#### Advanced piping examples
+```bash
+# Multi-line piped input
+echo -e "Fix login bug\nAdd validation\nUpdate tests" | crush-sandbox run
+
+# Heredoc piped input
+crush-sandbox run <<EOF
+Create a login form with:
+- Email field
+- Password field
+- Remember me checkbox
+- Login button
+EOF
+
+# Quiet mode with piping
+echo "Refactor code" | crush-sandbox run --quiet
+```
+
+#### With worktrees
+```bash
+# Generate code in worktree for review
+crush-sandbox run --worktree feature-ui -p "Redesign the user profile page" --quiet
+
+# Review in main workspace
+cd ../
+# Compare changes
+git diff main .worktrees/feature-ui/
+```
+
+#### Error handling
+```bash
+# --shell not allowed with -p
+crush-sandbox run --shell -p "test"
+# Error: --shell flag cannot be used with -p or piped input
+
+# --shell not allowed with piped input
+echo "test" | crush-sandbox run --shell
+# Error: --shell flag cannot be used with -p or piped input
+
+# Empty prompt passes through
+echo "" | crush-sandbox run
+# Executes: crush run "" (Crush CLI handles empty prompt)
 ```
 
 ### Basic Usage Examples
