@@ -67,6 +67,7 @@ print_usage() {
     echo "  --dry-run               Preview uninstall actions without executing"
     echo "  --worktree [name]       Create a worktree with optional name (defaults to worktree name as branch name)"
     echo "  --branch-name [name]    Specify branch name for worktree (skips branch prompt, requires --worktree)"
+    echo "  -p \"prompt\"           Send prompt directly to Crush CLI (programmatic mode)"
 }
 
 validate_docker() {
@@ -486,6 +487,8 @@ run_container() {
     local shell_mode="$2"
     local host_config_path="$3"
     local workspace="$4"
+    local programmatic_mode="$5"
+    local prompt="$6"
 
     # Start the container (or restart if it was stopped)
     echo "Starting container..."
@@ -528,41 +531,54 @@ run_container() {
     docker exec "$container_name" sh -c "export PATH=/home/node/.npm-global/bin:\$PATH && if command -v pnpm >/dev/null 2>&1; then pnpm config set cache-dir /workspace-cache/pnpm/cache && pnpm config set store-dir /workspace-cache/pnpm/store && echo 'pnpm store configured to:' && pnpm store path; else echo 'pnpm not installed'; fi"
 
     # Execute command in container
-    # Build docker exec args
-    local docker_exec_args=""
+    # Build docker exec args as an array to handle paths with spaces
+    local docker_exec_args=()
 
     # Add working directory, to override any previous -w settings if worktree
-    docker_exec_args="$docker_exec_args -w $workspace"
+    docker_exec_args+=("-w")
+    docker_exec_args+=("$workspace")
 
     # Add CRUSH_GLOBAL_CONFIG
-    docker_exec_args="$docker_exec_args -e CRUSH_GLOBAL_CONFIG=/tmp/crush-config/merged"
+    docker_exec_args+=("-e")
+    docker_exec_args+=("CRUSH_GLOBAL_CONFIG=/tmp/crush-config/merged")
 
     # Add PATH with npm global prefix so crush and pnpm can be found
     local container_path
     container_path=$(docker exec "$container_name" sh -c 'echo $PATH')
-    docker_exec_args="$docker_exec_args -e PATH=/home/node/.npm-global/bin:$container_path"
+    docker_exec_args+=("-e")
+    docker_exec_args+=("PATH=/home/node/.npm-global/bin:$container_path")
 
     if [ "$shell_mode" = "true" ]; then
         # Execute an interactive shell in the container (for debugging)
         echo "Starting interactive shell in sandbox..."
         if [ -t 0 ]; then
             # Interactive mode with TTY
-            docker exec -it $docker_exec_args "$container_name" /bin/sh
+            docker exec -it "${docker_exec_args[@]}" "$container_name" /bin/sh
         else
             # Non-interactive mode (for testing)
             echo "Warning: Not running in TTY mode, starting shell anyway..."
-            docker exec -i $docker_exec_args "$container_name" /bin/sh
+            docker exec -i "${docker_exec_args[@]}" "$container_name" /bin/sh
+        fi
+    elif [ "$programmatic_mode" = "true" ]; then
+        # Programmatic mode: execute crush run with prompt
+        # Don't use -i flag to avoid Crush reading from terminal stdin
+        echo "Executing: crush run \"$prompt\""
+        docker exec "${docker_exec_args[@]}" "$container_name" crush run $prompt
+        EXEC_EXIT_CODE=$?
+        echo "Crush CLI exited with code: $EXEC_EXIT_CODE"
+        if [ $EXEC_EXIT_CODE -ne 0 ]; then
+            echo "Error: Crush CLI exited with code: $EXEC_EXIT_CODE" >&2
         fi
     else
-        # Execute Crush CLI
+        # Interactive mode: execute crush without arguments
         echo "Starting Crush CLI..."
         if [ -t 0 ]; then
             # Interactive mode with TTY
-            docker exec -it $docker_exec_args "$container_name" crush
+            docker exec -it "${docker_exec_args[@]}" "$container_name" crush
         else
             # Non-interactive mode (for testing)
             echo "Warning: Not running in TTY mode, starting Crush CLI anyway..."
-            docker exec -i $docker_exec_args "$container_name" crush
+            docker exec -i "${docker_exec_args[@]}" "$container_name" crush
         fi
     fi
 
@@ -701,7 +717,7 @@ run_command() {
     fi
 
     # Run the container
-    run_container "$container_name" "$SHELL_MODE" "$host_config_path" "$workspace"
+    run_container "$container_name" "$SHELL_MODE" "$host_config_path" "$workspace" "$PROGRAMATIC_MODE" "$PROMPT"
 }
 
 clean_command() {
@@ -1701,6 +1717,8 @@ WORKTREE_NAME=""
 BRANCH_NAME=""
 LIST_WORKTREES="false"
 REMOVE_WORKTREE=""
+PROGRAMATIC_MODE="false"
+PROMPT=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -1746,6 +1764,15 @@ while [[ $# -gt 0 ]]; do
             BRANCH_NAME="$2"
             shift 2
             ;;
+        -p)
+            if [[ -z "$2" || "$2" =~ ^- ]]; then
+                echo "Error: -p requires a value" >&2
+                exit 1
+            fi
+            PROMPT="$2"
+            PROGRAMATIC_MODE="true"
+            shift 2
+            ;;
         --list-worktrees)
             LIST_WORKTREES="true"
             shift
@@ -1770,6 +1797,20 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# Detect piped stdin input (US-002)
+# Check if stdin is a pipe or redirected from file
+if [ "$PROGRAMATIC_MODE" != "true" ]; then
+    if [ -p /dev/stdin ]; then
+        # Stdin is a pipe (e.g., echo "text" | ./script)
+        PROMPT=$(cat)
+        PROGRAMATIC_MODE="true"
+    elif [ -f /dev/stdin ]; then
+        # Stdin is redirected from file (e.g., heredocs)
+        PROMPT=$(cat)
+        PROGRAMATIC_MODE="true"
+    fi
+fi
 
 # Show version and exit if requested
 if [ "$SHOW_VERSION" = "true" ]; then
