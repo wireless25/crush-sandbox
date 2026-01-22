@@ -402,6 +402,7 @@ create_container() {
     local git_email="$4"
     local cache_volume_name="$5"
     local host_config_path="$6"
+    local host_session_data_path="$7"
 
     local base_image="${DOCKER_IMAGE}"
     local docker_args=(
@@ -423,6 +424,11 @@ create_container() {
     # Mount host Crush config read-only if available
     if [ -n "$host_config_path" ]; then
         docker_args+=("-v" "${host_config_path}:/host-crush-config:ro")
+    fi
+
+    # Mount host session data read-only if available
+    if [ -n "$host_session_data_path" ]; then
+        docker_args+=("-v" "${host_session_data_path}:/host-session-data:ro")
     fi
 
     # Configure npm cache to use persistent volume
@@ -482,22 +488,31 @@ ENDSCRIPT' >/dev/null 2>&1
 setup_crush_config_script() {
     local container_name="$1"
 
-    # Create the config merge script inside the container in /home/node/
+    # Create config merge script inside the container in /home/node/
     docker exec "$container_name" sh -c 'cat > /home/node/setup-crush-config.sh << ENDSCRIPT
 #!/bin/sh
 
-# Create merged config directory
-mkdir -p /tmp/crush-config/merged
+# Create separate writable directories for config and data
+mkdir -p /tmp/crush-config/config
+mkdir -p /tmp/crush-config/data
 
-# Copy host config if available
+# Copy host config to writable location (from read-only mount)
 if [ -d /host-crush-config ]; then
-    cp -r /host-crush-config/* /tmp/crush-config/merged/ 2>/dev/null || true
-    echo "Merged host configuration from /host-crush-config"
+    cp -r /host-crush-config/* /tmp/crush-config/config/ 2>/dev/null || true
+    echo "Copied host configuration from /host-crush-config to /tmp/crush-config/config"
 fi
 
-# Set CRUSH_GLOBAL_CONFIG environment variable
-export CRUSH_GLOBAL_CONFIG=/tmp/crush-config/merged
-echo "Configuration merged to: \$CRUSH_GLOBAL_CONFIG"
+# Copy session data to writable location (from read-only mount)
+if [ -d /host-session-data ]; then
+    cp -r /host-session-data/* /tmp/crush-config/data/ 2>/dev/null || true
+    echo "Copied session data from /host-session-data to /tmp/crush-config/data"
+fi
+
+# Set environment variables to point to separate writable directories
+export CRUSH_GLOBAL_CONFIG=/tmp/crush-config/config
+export CRUSH_GLOBAL_DATA=/tmp/crush-config/data
+echo "CRUSH_GLOBAL_CONFIG set to: \$CRUSH_GLOBAL_CONFIG"
+echo "CRUSH_GLOBAL_DATA set to: \$CRUSH_GLOBAL_DATA"
 ENDSCRIPT' >/dev/null 2>&1
 
     # Make the script executable
@@ -562,7 +577,11 @@ run_container() {
 
     # Add CRUSH_GLOBAL_CONFIG
     docker_exec_args+=("-e")
-    docker_exec_args+=("CRUSH_GLOBAL_CONFIG=/tmp/crush-config/merged")
+    docker_exec_args+=("CRUSH_GLOBAL_CONFIG=/tmp/crush-config/config")
+
+    # Add CRUSH_GLOBAL_DATA
+    docker_exec_args+=("-e")
+    docker_exec_args+=("CRUSH_GLOBAL_DATA=/tmp/crush-config/data")
 
     # Add PATH with npm global prefix so crush and pnpm can be found
     local container_path
@@ -730,12 +749,23 @@ run_command() {
         fi
     fi
 
+    # Get host Crush session data path
+    local host_session_data_path=""
+    if [ "$NO_HOST_CONFIG" = "true" ]; then
+        echo "Skipping host Crush session data (--no-host-config)"
+    else
+        host_session_data_path="$(get_host_session_data_path)"
+        if [ -n "$host_session_data_path" ]; then
+            echo "Host Crush session data: $host_session_data_path"
+        fi
+    fi
+
     # Check if container exists, create if not
     if container_exists "$container_name"; then
         echo "Reusing existing container"
     else
         echo "Creating new container"
-        create_container "$workspace" "$container_name" "$git_name" "$git_email" "$cache_volume_name" "$host_config_path"
+        create_container "$workspace" "$container_name" "$git_name" "$git_email" "$cache_volume_name" "$host_config_path" "$host_session_data_path"
     fi
 
     # Run the container

@@ -260,12 +260,26 @@ Detects and validates host Crush configuration directory.
 - Returns empty string with warning if no config found
 - Exits with error if directory exists but is not readable
 
+### `get_host_session_data_path()`
+Detects and validates host Crush session data directory.
+- Checks `~/.local/share/crush/`
+- Validates directory exists and is readable
+- Returns empty string with warning if no session data found
+- Exits with error if directory exists but is not readable
+
 ### `setup_crush_config_script()`
 Creates a startup script inside the container at `/usr/local/bin/setup-crush-config.sh` that:
-- Creates merged config directory at `/tmp/crush-config/merged/`
-- Copies host config from `/host-crush-config` if available
-- Sets `CRUSH_GLOBAL_CONFIG` environment variable to merged directory
-- Logs which sources were merged
+- Creates **separate** writable directories for config and data
+- `/tmp/crush-config/config` - writable copy of host configuration
+- `/tmp/crush-config/data` - writable copy of host session data
+- Copies host config from read-only mount `/host-crush-config`
+- Copies host session data from read-only mount `/host-session-data`
+- Sets `CRUSH_GLOBAL_CONFIG` environment variable to `/tmp/crush-config/config`
+- Sets `CRUSH_GLOBAL_DATA` environment variable to `/tmp/crush-config/data`
+- Logs which sources were copied
+- **Note**: Runtime changes inside container are lost when container stops
+  - Users should authenticate and configure Crush on host machine first
+  - Container only reads pre-configured session data
 
 ### `validate_git_repository()`
 Validates that the current directory is a git repository.
@@ -658,10 +672,20 @@ EOF
 
 ### Configuration Handling
 - Host config detected from `~/.config/crush/`
+- Host session data detected from `~/.local/share/crush/`
 - Configuration mounted read-only inside container at `/host-crush-config`
-- `CRUSH_GLOBAL_CONFIG` environment variable set to merged config directory
+- Session data mounted read-only inside container at `/host-session-data`
+- **Separate writable directories created inside container**:
+  - `/tmp/crush-config/config` - writable copy of host config
+  - `/tmp/crush-config/data` - writable copy of host session data
+- `CRUSH_GLOBAL_CONFIG` environment variable points to `/tmp/crush-config/config`
+- `CRUSH_GLOBAL_DATA` environment variable points to `/tmp/crush-config/data`
 - Secret files detected by pattern and injected as environment variables
 - All mounts are read-only for security (container cannot modify host files)
+- **Important**: Runtime changes inside container (tokens, model preferences) are **lost on container stop**
+  - Users should authenticate and configure Crush on the host machine first
+  - Container only reads the pre-authenticated session data
+  - Use `--no-host-config` to skip mounting host config and data
 
 ### Credential Scanning
 - Workspace scanned with gitleaks before container starts
@@ -975,6 +999,16 @@ From `prd-distribution-and-docs.md`:
 - Verify directory is readable: `test -r ~/.config/crush && echo readable`
 - Check script output for warnings about missing config
 - Use `--shell` flag to inspect inside container: `ls /host-crush-config`
+
+### Session data lost / re-authentication required
+- **Expected behavior**: Session data changes inside container are lost on container stop
+- Session data is mounted read-only from host for security
+- **Solution**: Authenticate and configure Crush on host machine first
+  - Run Crush CLI on host: `crush`
+  - Complete authentication (device code flow, API keys, etc.)
+  - Session data saved to `~/.local/share/crush/`
+  - Then run `crush-sandbox run` to use pre-authenticated session
+- **Alternative**: Use `--no-host-config` to run without host session data (requires re-authentication each session)
 
 ### "Multiple containers found" when running clean
 - This is normal when you have multiple worktrees
