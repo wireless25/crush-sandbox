@@ -215,6 +215,27 @@ get_host_crush_config_path() {
     echo "$config_path"
 }
 
+get_host_session_data_path() {
+    local session_data_path=""
+
+    # Check ~/.local/share/crush/
+    local data_dir="$HOME/.local/share/crush"
+    if [ -d "$data_dir" ]; then
+        if [ -r "$data_dir" ]; then
+            session_data_path="$data_dir"
+        else
+            echo "Error: Crush session data directory exists but is not readable: $data_dir" >&2
+            exit 1
+        fi
+    fi
+
+    # Log warning if no session data directory found (but continue execution)
+    if [ -z "$session_data_path" ]; then
+        echo "Warning: No host Crush session data directory found (checked ~/.local/share/crush/)" >&2
+    fi
+
+    echo "$session_data_path"
+}
 
 ensure_gitleaks_image() {
     local gitleaks_image="ghcr.io/gitleaks/gitleaks:latest"
