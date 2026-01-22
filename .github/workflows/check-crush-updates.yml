@@ -152,33 +152,11 @@ jobs:
         if: |
           steps.compare-versions.outputs.update_needed == 'true' &&
           steps.check-existing-prs.outputs.existing_pr != 'true'
-        run: |
-          VERSION="${{ steps.latest-version.outputs.version }}"
-          BRANCH_NAME="update/crush-v$VERSION"
-          CURRENT="${{ steps.current-version.outputs.version }}"
-
-          gh pr create \
-            --title "Update Crush CLI to v$VERSION" \
-            --body "## Update Crush CLI to v$VERSION
-
-          This PR updates the Crush CLI version from v$CURRENT to v$VERSION.
-
-          ### Testing Instructions
-
-          1. Review the changes to \`docker-sandbox-crush\`
-          2. Test the updated script locally:
-             \`\`\`bash
-             ./docker-sandbox-crush clean --force
-             ./docker-sandbox-crush run
-             \`\`\`
-          3. Verify Crush CLI works correctly inside the container
-          4. Check that the correct version is installed
-
-          ### Automated
-
-          This PR was automatically created by the Crush Version Update CI workflow." \
-            --base main \
-            --label crush-update \
-            --reviewer wireless25
-        env:
-          GH_TOKEN: ${{ github.token }}
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ steps.current-version.outputs.version }}
+          title: "Update Crush CLI to v${{ steps.latest-version.outputs.version }}"
+          body: "## Update Crush CLI to v${{ steps.latest-version.outputs.version }}"
+          labels: crush-update
+          commit-message: "fix: update Crush CLI to v${{ steps.latest-version.outputs.version }}"
