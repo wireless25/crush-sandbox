@@ -173,7 +173,8 @@ The Docker sandbox automatically provides Crush CLI configuration:
 ### Configuration Sources
 
 **Host configuration** (global defaults):
-- `~/.config/crush/`
+- `~/.config/crush/` - Global Crush config (read-only mount)
+- `~/.local/share/crush/` - Crush session data (read-only mount)
 
 **Workspace configuration** (workspace-specific):
 - `.crush.json` or `crush.json` (relative to workspace root)
@@ -181,6 +182,28 @@ The Docker sandbox automatically provides Crush CLI configuration:
 If you maintain global Crush config with commands, skills, or settings, this will be mounted into the container. Any workspace-specific config will override these settings.
 Config files in the workspace are mounted into the container with the rest of the code and take precedence over host config by default in Crush. Make sure to configure your skills
 and commands accordingly. If you want to use global configured skills, add the `/tmp/crush-config/merged/skills` path to the skills option in the config (global on host or in workspace) to make Crush pick them up.
+
+### Session Data Mounting
+
+Crush CLI session data (including authentication tokens, model preferences, and other runtime state) is mounted from your host machine into the container.
+
+**Important**: Session data is mounted **read-only** from `~/.local/share/crush/` on your host. This means:
+
+- **Configuration changes made inside the container are lost when the container stops**
+  - Tokens and authentication must be completed on the host machine
+  - Model preferences and settings should be configured on the host
+  - The container only reads pre-authenticated session data
+
+- **Recommended workflow**:
+  1. Run Crush CLI on the host machine first: `crush`
+  2. Complete authentication and configure your preferences
+  3. Run `crush-sandbox run` to use your pre-configured session
+  4. Use `--no-host-config` flag to skip host config/session mounting (requires re-authentication each session)
+
+- **Why read-only?**
+  - Prevents the AI agent from modifying your authentication tokens
+  - Ensures session integrity and security
+  - Keeps configuration changes persistent on your host machine
 
 **Example to include skills from global host in the config**:
 ```json

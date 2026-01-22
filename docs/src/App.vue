@@ -620,7 +620,7 @@ const copyToClipboard = async (code: string, id: string) => {
             <div class="space-y-8">
               <!-- Step 1 -->
               <div class="flex gap-6 items-start">
-                <div class="flex-shrink-0 w-16 h-16 bg-[#ffb000] text-[#0a0a0a] flex items-center justify-center font-bold text-2xl">01</div>
+                <div class="flex-shrink-0 w-8 h-8 bg-[#ffb000] text-[#0a0a0a] flex items-center justify-center font-bold text-sm">01</div>
                 <div class="flex-1">
                   <h4 class="text-xl font-bold text-[#e0e0e0] mb-3">Container Creation</h4>
                   <p class="text-[#999] text-sm mb-4">A new Docker container is spawned with your project mounted inside. The container runs as a non-root user with dropped Linux capabilities for security.</p>
@@ -629,7 +629,7 @@ const copyToClipboard = async (code: string, id: string) => {
 
               <!-- Step 2 -->
               <div class="flex gap-6 items-start">
-                <div class="flex-shrink-0 w-16 h-16 bg-[#ffb000] text-[#0a0a0a] flex items-center justify-center font-bold text-2xl">02</div>
+                <div class="flex-shrink-0 w-8 h-8 bg-[#ffb000] text-[#0a0a0a] flex items-center justify-center font-bold text-sm">02</div>
                 <div class="flex-1">
                   <h4 class="text-xl font-bold text-[#e0e0e0] mb-3">Volume Mounting</h4>
                   <p class="text-[#999] text-sm mb-4">Your project directory is mounted read-write into the container. Changes inside the container reflect instantly on your host system.</p>
@@ -638,7 +638,7 @@ const copyToClipboard = async (code: string, id: string) => {
 
               <!-- Step 3 -->
               <div class="flex gap-6 items-start">
-                <div class="flex-shrink-0 w-16 h-16 bg-[#ffb000] text-[#0a0a0a] flex items-center justify-center font-bold text-2xl">03</div>
+                <div class="flex-shrink-0 w-8 h-8 bg-[#ffb000] text-[#0a0a0a] flex items-center justify-center font-bold text-sm">03</div>
                 <div class="flex-1">
                   <h4 class="text-xl font-bold text-[#e0e0e0] mb-3">Cache Management</h4>
                   <p class="text-[#999] text-sm mb-4">Per-workspace cache volumes persist across worktree containers and sessions. npm and pnpm install blazing fast every time — no redownloading packages.</p>
@@ -647,7 +647,7 @@ const copyToClipboard = async (code: string, id: string) => {
 
               <!-- Step 4 -->
               <div class="flex gap-6 items-start">
-                <div class="flex-shrink-0 w-16 h-16 bg-[#ffb000] text-[#0a0a0a] flex items-center justify-center font-bold text-2xl">04</div>
+                <div class="flex-shrink-0 w-8 h-8 bg-[#ffb000] text-[#0a0a0a] flex items-center justify-center font-bold text-sm">04</div>
                 <div class="flex-1">
                   <h4 class="text-xl font-bold text-[#e0e0e0] mb-3">Automatic Crush CLI Install</h4>
                   <p class="text-[#999] text-sm mb-4">On first run, Crush CLI is installed globally inside the container via npm. Subsequent sessions use the cached installation.</p>
@@ -656,7 +656,7 @@ const copyToClipboard = async (code: string, id: string) => {
 
               <!-- Step 5 -->
               <div class="flex gap-6 items-start">
-                <div class="flex-shrink-0 w-16 h-16 bg-[#ffb000] text-[#0a0a0a] flex items-center justify-center font-bold text-2xl">05</div>
+                <div class="flex-shrink-0 w-8 h-8 bg-[#ffb000] text-[#0a0a0a] flex items-center justify-center font-bold text-sm">05</div>
                 <div class="flex-1">
                   <h4 class="text-xl font-bold text-[#e0e0e0] mb-3">Git Configuration Passthrough</h4>
                   <p class="text-[#999] text-sm mb-4">Your git identity is automatically passed into the container. Commits made by Crush CLI use your real name and email.</p>
@@ -762,6 +762,179 @@ const copyToClipboard = async (code: string, id: string) => {
                     <h4 class="text-lg font-bold text-[#e0e0e0] mb-2">EXIT</h4>
                     <p class="text-[#999] text-sm">Crush CLI exits. Container is stopped. Cache volumes persist for next session.</p>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Configuration Section -->
+      <section id="configuration" class="max-w-7xl mx-auto py-16">
+        <div class="border-b-4 border-[#333] pb-4 mb-12">
+          <span class="text-xs text-[#ffb000] tracking-widest uppercase">// Configuration</span>
+        </div>
+
+        <div class="space-y-8">
+          <!-- Config Sources -->
+          <div class="p-6 border-2 border-[#222]">
+            <h3 class="text-4xl font-bold text-[#ffb000] mb-4">Configuration Sources</h3>
+            <p class="text-[#999] text-sm mb-6 leading-relaxed">
+              Crush CLI configuration is intelligently merged from multiple sources:
+            </p>
+
+            <div class="grid md:grid-cols-3 gap-4">
+              <div class="p-5 border border-[#333]">
+                <h4 class="text-lg font-bold text-[#e0e0e0] mb-2">Host Config</h4>
+                <p class="text-[#999] text-sm"><code class="text-[#ffb000]">~/.config/crush/</code> mounted read-only. Global defaults.</p>
+              </div>
+
+              <div class="p-5 border border-[#333]">
+                <h4 class="text-lg font-bold text-[#e0e0e0] mb-2">Session Data</h4>
+                <p class="text-[#999] text-sm"><code class="text-[#ffb000]">~/.local/share/crush/</code> mounted read-only. Auth tokens, preferences.</p>
+              </div>
+
+              <div class="p-5 border border-[#333]">
+                <h4 class="text-lg font-bold text-[#e0e0e0] mb-2">Workspace Config</h4>
+                <p class="text-[#999] text-sm"><code class="text-[#ffb000]">.crush.json</code> in workspace. Overrides globals.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Read-Only Warning -->
+          <div class="p-6 border-2 border-[#ffb000]">
+            <h3 class="text-4xl font-bold text-[#ffb000] mb-4">Read-Only Session Data</h3>
+            <p class="text-[#e0e0e0] text-base leading-relaxed mb-4">
+              Session data is mounted <span class="text-[#ffb000] font-bold">read-only</span> from your host machine.
+            </p>
+            <ul class="space-y-2 text-[#999] text-sm">
+              <li class="flex items-start gap-2">
+                <span class="text-[#ffb000]">›</span>
+                <span>Configuration changes made inside the container are <span class="text-red-400">lost when the container stops</span></span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="text-[#ffb000]">›</span>
+                <span>Tokens and authentication must be completed <span class="text-red-400">on the host machine</span></span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="text-[#ffb000]">›</span>
+                <span>The container only reads pre-authenticated session data</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Recommended Workflow -->
+          <div class="p-6 border-2 border-[#222]">
+            <h3 class="text-4xl font-bold text-[#ffb000] mb-4">Recommended Workflow</h3>
+            <p class="text-[#999] text-base leading-relaxed mb-6">
+              Follow this workflow to use Crush configuration properly in the sandbox:
+            </p>
+
+            <div class="space-y-6">
+              <div class="flex gap-4 items-start">
+                <div class="flex-shrink-0 w-8 h-8 bg-[#ffb000] text-[#0a0a0a] flex items-center justify-center font-bold text-sm">1</div>
+                <div class="flex-1">
+                  <h4 class="text-lg font-bold text-[#e0e0e0] mb-2">Configure on Host First</h4>
+                  <p class="text-[#999] text-sm mb-3">Run Crush CLI on your host machine to complete authentication:</p>
+                  <div class="relative group/code">
+                    <button
+                      @click="copyToClipboard('crush', 'config-step-1')"
+                      class="absolute top-2 right-2 z-10 p-2 border border-[#333] bg-[#1a1a1a] hover:border-[#ffb000] hover:text-[#ffb000] transition-colors"
+                      aria-label="Copy to clipboard">
+                      <span v-if="copiedCode !== 'config-step-1'" class="text-xs">COPY</span>
+                      <span v-else class="text-xs text-green-400">COPIED</span>
+                    </button>
+                    <div class="bg-[#0a0a0a] border-2 border-[#222] p-4 text-sm font-mono">
+                      <code class="text-[#e0e0e0]">crush</code>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex gap-4 items-start">
+                <div class="flex-shrink-0 w-8 h-8 bg-[#ffb000] text-[#0a0a0a] flex items-center justify-center font-bold text-sm">2</div>
+                <div class="flex-1">
+                  <h4 class="text-lg font-bold text-[#e0e0e0] mb-2">Complete Authentication</h4>
+                  <p class="text-[#999] text-sm">Complete the device code flow, add API keys, configure models and preferences.</p>
+                </div>
+              </div>
+
+              <div class="flex gap-4 items-start">
+                <div class="flex-shrink-0 w-8 h-8 bg-[#ffb000] text-[#0a0a0a] flex items-center justify-center font-bold text-sm">3</div>
+                <div class="flex-1">
+                  <h4 class="text-lg font-bold text-[#e0e0e0] mb-2">Run Crush Sandbox</h4>
+                  <p class="text-[#999] text-sm mb-3">Start the sandbox to use your pre-configured session:</p>
+                  <div class="relative group/code">
+                    <button
+                      @click="copyToClipboard('crush-sandbox run', 'config-step-3')"
+                      class="absolute top-2 right-2 z-10 p-2 border border-[#333] bg-[#1a1a1a] hover:border-[#ffb000] hover:text-[#ffb000] transition-colors"
+                      aria-label="Copy to clipboard">
+                      <span v-if="copiedCode !== 'config-step-3'" class="text-xs">COPY</span>
+                      <span v-else class="text-xs text-green-400">COPIED</span>
+                    </button>
+                    <div class="bg-[#0a0a0a] border-2 border-[#222] p-4 text-sm font-mono">
+                      <code class="text-[#e0e0e0]">crush-sandbox run</code>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Why Read-Only -->
+          <div class="p-6 border-2 border-[#222]">
+            <h3 class="text-2xl font-bold text-[#ffb000] mb-4">Why Read-Only Mounting?</h3>
+            <p class="text-[#999] text-base leading-relaxed mb-6">
+              Read-only mounting provides critical security and integrity benefits.
+            </p>
+
+            <div class="grid md:grid-cols-2 gap-4">
+              <div class="p-5 border border-[#333]">
+                <h4 class="text-lg font-bold text-[#e0e0e0] mb-2">Security</h4>
+                <p class="text-[#999] text-sm leading-relaxed">Prevents the AI agent from modifying authentication tokens and sensitive session data.</p>
+              </div>
+
+              <div class="p-5 border border-[#333]">
+                <h4 class="text-lg font-bold text-[#e0e0e0] mb-2">Integrity</h4>
+                <p class="text-[#999] text-sm leading-relaxed">Ensures session data integrity. No accidental overwrites or corruption.</p>
+              </div>
+
+              <div class="p-5 border border-[#333]">
+                <h4 class="text-lg font-bold text-[#e0e0e0] mb-2">Persistence</h4>
+                <p class="text-[#999] text-sm leading-relaxed">Configuration changes persist on your host machine across all containers.</p>
+              </div>
+
+              <div class="p-5 border border-[#333]">
+                <h4 class="text-lg font-bold text-[#e0e0e0] mb-2">Reproducibility</h4>
+                <p class="text-[#999] text-sm leading-relaxed">Consistent configuration across runs. Same session, same behavior.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Configuration Control Flags -->
+          <div class="p-6 border-2 border-[#222]">
+            <h3 class="text-2xl font-bold text-[#ffb000] mb-4">Configuration Control Flags</h3>
+            <p class="text-[#999] text-base leading-relaxed mb-6">
+              Control configuration behavior with these flags:
+            </p>
+
+            <div class="flex items-start gap-4 p-4 border border-[#333] mb-4">
+              <span class="text-[#ffb000] font-mono text-sm font-bold px-3 py-1 border border-[#ffb000] whitespace-nowrap">--no-host-config</span>
+              <p class="text-[#e0e0e0] text-sm flex-1">Skip mounting host Crush config directory. Requires re-authentication inside the container.</p>
+            </div>
+
+            <div class="p-4 border border-[#333] bg-[#0a0a0a]">
+              <h4 class="text-base font-bold text-[#ffb000] mb-2">Example: Skip Host Configuration</h4>
+              <div class="relative group/code">
+                <button
+                  @click="copyToClipboard('crush-sandbox run --no-host-config', 'config-flag-example')"
+                  class="absolute top-2 right-2 z-10 p-2 border border-[#333] bg-[#1a1a1a] hover:border-[#ffb000] hover:text-[#ffb000] transition-colors"
+                  aria-label="Copy to clipboard">
+                  <span v-if="copiedCode !== 'config-flag-example'" class="text-xs">COPY</span>
+                  <span v-else class="text-xs text-green-400">COPIED</span>
+                </button>
+                <div class="bg-[#0a0a0a] border-2 border-[#222] p-4 text-sm font-mono">
+                  <code class="text-[#e0e0e0]">crush-sandbox run --no-host-config</code>
                 </div>
               </div>
             </div>
