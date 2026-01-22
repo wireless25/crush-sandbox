@@ -1,0 +1,184 @@
+name: Check Crush Updates
+
+on:
+  schedule:
+    - cron: '0 */12 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-crush-updates:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get latest Crush version from npm
+        id: latest-version
+        run: |
+          LATEST_VERSION=$(npm view @charmland/crush version)
+          echo "version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+          echo "Latest @charmland/crush version: $LATEST_VERSION"
+
+      - name: Parse current CRUSH_VERSION from script
+        id: current-version
+        run: |
+          CURRENT_VERSION=$(grep '^CRUSH_VERSION=' docker-sandbox-crush | cut -d'"' -f2)
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "Current Crush version: $CURRENT_VERSION"
+
+      - name: Compare versions
+        id: compare-versions
+        run: |
+          CURRENT="${{ steps.current-version.outputs.version }}"
+          LATEST="${{ steps.latest-version.outputs.version }}"
+
+          echo "Comparing: $CURRENT vs $LATEST"
+
+          # Parse version numbers
+          IFS='.' read -r CURRENT_MAJOR CURRENT_MINOR CURRENT_PATCH <<< "$CURRENT"
+          IFS='.' read -r LATEST_MAJOR LATEST_MINOR LATEST_PATCH <<< "$LATEST"
+
+          # Remove 'v' prefix if present
+          CURRENT_MAJOR="${CURRENT_MAJOR#v}"
+          LATEST_MAJOR="${LATEST_MAJOR#v}"
+
+          echo "Current: $CURRENT_MAJOR.$CURRENT_MINOR.$CURRENT_PATCH"
+          echo "Latest: $LATEST_MAJOR.$LATEST_MINOR.$LATEST_PATCH"
+
+          # Compare versions
+          if [ "$CURRENT_MAJOR" -gt "$LATEST_MAJOR" ] 2>/dev/null; then
+            echo "update_needed=false" >> $GITHUB_OUTPUT
+            echo "Current version is newer (major)"
+          elif [ "$CURRENT_MAJOR" -lt "$LATEST_MAJOR" ] 2>/dev/null; then
+            echo "update_needed=true" >> $GITHUB_OUTPUT
+            echo "Update needed (major)"
+          elif [ "$CURRENT_MINOR" -gt "$LATEST_MINOR" ] 2>/dev/null; then
+            echo "update_needed=false" >> $GITHUB_OUTPUT
+            echo "Current version is newer (minor)"
+          elif [ "$CURRENT_MINOR" -lt "$LATEST_MINOR" ] 2>/dev/null; then
+            echo "update_needed=true" >> $GITHUB_OUTPUT
+            echo "Update needed (minor)"
+          elif [ "$CURRENT_PATCH" -lt "$LATEST_PATCH" ] 2>/dev/null; then
+            echo "update_needed=true" >> $GITHUB_OUTPUT
+            echo "Update needed (patch)"
+          else
+            echo "update_needed=false" >> $GITHUB_OUTPUT
+            echo "Current version is up-to-date: v$LATEST"
+          fi
+
+      - name: Exit if up-to-date
+        if: steps.compare-versions.outputs.update_needed != 'true'
+        run: |
+          echo "Current version is up-to-date: v${{ steps.current-version.outputs.version }}"
+          echo "No action needed"
+
+      - name: Check for existing PRs
+        id: check-existing-prs
+        if: steps.compare-versions.outputs.update_needed == 'true'
+        run: |
+          LATEST="${{ steps.latest-version.outputs.version }}"
+          echo "Checking for existing PRs with version $LATEST"
+
+          # Search for existing PRs with crush-update label
+          EXISTING_PR=$(gh pr list \
+            --label crush-update \
+            --state all \
+            --json title,number \
+            --jq '.[] | select(.title == "Update Crush CLI to v'$LATEST'") | "\(.number) \(.title)"' || echo "")
+
+          if [ -n "$EXISTING_PR" ]; then
+            echo "existing_pr=true" >> $GITHUB_OUTPUT
+            echo "Existing PR found: $EXISTING_PR"
+            echo "Skipping PR creation"
+          else
+            echo "existing_pr=false" >> $GITHUB_OUTPUT
+            echo "No existing PR found for version $LATEST"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Exit if PR already exists
+        if: steps.check-existing-prs.outputs.existing_pr == 'true'
+        run: |
+          LATEST="${{ steps.latest-version.outputs.version }}"
+          echo "PR for version v$LATEST already exists"
+          echo "Skipping branch and PR creation"
+
+      - name: Create update branch
+        if: |
+          steps.compare-versions.outputs.update_needed == 'true' &&
+          steps.check-existing-prs.outputs.existing_pr != 'true'
+        run: |
+          VERSION="${{ steps.latest-version.outputs.version }}"
+          BRANCH_NAME="update/crush-v$VERSION"
+
+          echo "Creating branch: $BRANCH_NAME"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH_NAME"
+
+      - name: Update CRUSH_VERSION in script
+        if: |
+          steps.compare-versions.outputs.update_needed == 'true' &&
+          steps.check-existing-prs.outputs.existing_pr != 'true'
+        run: |
+          VERSION="${{ steps.latest-version.outputs.version }}"
+          sed -i "s/^CRUSH_VERSION=.*/CRUSH_VERSION=\"$VERSION\"/" docker-sandbox-crush
+          echo "Updated CRUSH_VERSION to $VERSION"
+
+      - name: Commit changes
+        if: |
+          steps.compare-versions.outputs.update_needed == 'true' &&
+          steps.check-existing-prs.outputs.existing_pr != 'true'
+        run: |
+          VERSION="${{ steps.latest-version.outputs.version }}"
+          git add docker-sandbox-crush
+          git commit -m "fix: update Crush CLI to v$VERSION"
+
+      - name: Push branch
+        if: |
+          steps.compare-versions.outputs.update_needed == 'true' &&
+          steps.check-existing-prs.outputs.existing_pr != 'true'
+        run: |
+          VERSION="${{ steps.latest-version.outputs.version }}"
+          BRANCH_NAME="update/crush-v$VERSION"
+          git push -u origin "$BRANCH_NAME"
+
+      - name: Create pull request
+        if: |
+          steps.compare-versions.outputs.update_needed == 'true' &&
+          steps.check-existing-prs.outputs.existing_pr != 'true'
+        run: |
+          VERSION="${{ steps.latest-version.outputs.version }}"
+          BRANCH_NAME="update/crush-v$VERSION"
+          CURRENT="${{ steps.current-version.outputs.version }}"
+
+          gh pr create \
+            --title "Update Crush CLI to v$VERSION" \
+            --body "## Update Crush CLI to v$VERSION
+
+          This PR updates the Crush CLI version from v$CURRENT to v$VERSION.
+
+          ### Testing Instructions
+
+          1. Review the changes to \`docker-sandbox-crush\`
+          2. Test the updated script locally:
+             \`\`\`bash
+             ./docker-sandbox-crush clean --force
+             ./docker-sandbox-crush run
+             \`\`\`
+          3. Verify Crush CLI works correctly inside the container
+          4. Check that the correct version is installed
+
+          ### Automated
+
+          This PR was automatically created by the Crush Version Update CI workflow." \
+            --base main \
+            --label crush-update \
+            --reviewer wireless25
+        env:
+          GH_TOKEN: ${{ github.token }}
