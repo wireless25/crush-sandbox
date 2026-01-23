@@ -160,3 +160,4 @@ jobs:
           body: "## Update Crush CLI to v${{ steps.latest-version.outputs.version }}"
           labels: crush-update
           commit-message: "fix: update Crush CLI to v${{ steps.latest-version.outputs.version }}"
+          base: main
