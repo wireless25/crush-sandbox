@@ -68,6 +68,7 @@ print_usage() {
     echo "  --dry-run               Preview uninstall actions without executing"
     echo "  --worktree [name]       Create a worktree with optional name (defaults to worktree name as branch name)"
     echo "  --branch-name [name]    Specify branch name for worktree (skips branch prompt, requires --worktree)"
+    echo "  --model "model"          Specify AI model for programmatic mode (e.g., 'openai/gpt-4', 'claude-3.5')"
     echo "  -p \"prompt\"           Send prompt directly to Crush CLI (programmatic mode)"
 }
 
@@ -526,6 +527,7 @@ run_container() {
     local workspace="$4"
     local programmatic_mode="$5"
     local prompt="$6"
+    local model="$7"
 
     # Start the container (or restart if it was stopped)
     echo "Starting container..."
@@ -603,12 +605,30 @@ run_container() {
     elif [ "$programmatic_mode" = "true" ]; then
         # Programmatic mode: execute crush run with prompt
         # Don't use -i flag to avoid Crush reading from terminal stdin
-        echo "Executing: crush run \"$prompt\""
-        docker exec "${docker_exec_args[@]}" "$container_name" crush run $prompt
+        # Temporarily disable 'set -e' to capture exit code without script termination in case of invalid --model input
+        set +e
+        if [ -n "$model" ]; then
+            echo "Executing: crush run --model \"$model\" \"$prompt\""
+            docker exec "${docker_exec_args[@]}" "$container_name" crush run --model "$model" $prompt
+        else
+            echo "Executing: crush run \"$prompt\""
+            docker exec "${docker_exec_args[@]}" "$container_name" crush run $prompt
+        fi
         EXEC_EXIT_CODE=$?
+        set -e
+
         echo "Crush CLI exited with code: $EXEC_EXIT_CODE"
         if [ $EXEC_EXIT_CODE -ne 0 ]; then
             echo "Error: Crush CLI exited with code: $EXEC_EXIT_CODE" >&2
+            if [ -n "$model" ]; then
+                echo "" >&2
+                echo "Possible issues:" >&2
+                echo "  - Invalid model name: '$model' may not be available" >&2
+                echo "  - Check model name with Crush CLI documentation" >&2
+                echo "  - Verify Crush CLI is properly installed" >&2
+                echo "" >&2
+            fi
+            exit $EXEC_EXIT_CODE
         fi
     else
         # Interactive mode: execute crush without arguments
@@ -769,7 +789,7 @@ run_command() {
     fi
 
     # Run the container
-    run_container "$container_name" "$SHELL_MODE" "$host_config_path" "$workspace" "$PROGRAMATIC_MODE" "$PROMPT"
+    run_container "$container_name" "$SHELL_MODE" "$host_config_path" "$workspace" "$PROGRAMATIC_MODE" "$PROMPT" "$MODEL"
 }
 
 clean_command() {
@@ -1771,6 +1791,7 @@ LIST_WORKTREES="false"
 REMOVE_WORKTREE=""
 PROGRAMATIC_MODE="false"
 PROMPT=""
+MODEL=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -1823,6 +1844,14 @@ while [[ $# -gt 0 ]]; do
             fi
             PROMPT="$2"
             PROGRAMATIC_MODE="true"
+            shift 2
+            ;;
+        --model)
+            if [[ -z "$2" || "$2" =~ ^- ]]; then
+                echo "Error: --model requires a value" >&2
+                exit 1
+            fi
+            MODEL="$2"
             shift 2
             ;;
         --list-worktrees)

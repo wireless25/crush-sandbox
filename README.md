@@ -317,9 +317,19 @@ EOF
 crush-sandbox run -p "Refactor code" --quiet
 ```
 
+**With `--model` flag (select AI model):**
+```bash
+crush-sandbox run -p "Create a REST API" --model "openai/gpt-4"
+```
+
 **With worktree:**
 ```bash
 crush-sandbox run --worktree feature-auth -p "Add OAuth login"
+```
+
+**With worktree and model:**
+```bash
+crush-sandbox run --worktree feature-auth -p "Add OAuth login" --model "claude-3.5"
 ```
 
 #### Programmatic Mode Details
@@ -337,13 +347,15 @@ crush-sandbox run --worktree feature-auth -p "Add OAuth login"
 - Heredocs with `-p` flag
 - Piped multi-line input
 
+**Model selection**: `--model` flag allows specifying which AI model to use (e.g., `--model "openai/gpt-4"`, `--model "claude-3.5"`). See [AGENTS.md](AGENTS.md) for detailed examples.
+
 **Quiet mode**: `--quiet` flag suppresses container setup messages in programmatic mode:
 
 Crush CLI output is always visible. Error messages always appear even in quiet mode.
 
 **Flag conflicts**: The `--shell` flag cannot be used with programmatic mode (`-p` flag or piped input).
 
-**Exit codes**: Crush CLI exit codes propagate to script exit for automation scripts.
+**Exit codes**: Crush CLI exit codes propagate to script exit for automation scripts. Error messages are explicitly captured and reported, even when Crush CLI fails due to invalid model names. When `--model` is specified and Crush CLI fails, the script provides troubleshooting hints about potential model validation issues.
 
 ### Start a debug shell
 
@@ -394,6 +406,7 @@ crush-sandbox --version
 | Option | Description |
 |--------|-------------|
 | `-p "prompt"` | Send prompt directly to Crush CLI (programmatic mode) |
+| `--model "model"` | Specify AI model for programmatic mode (e.g., `--model "openai/gpt-4"`) |
 | `--quiet` | Suppress container setup messages in programmatic mode |
 | `--shell` | Start interactive shell instead of Crush CLI (for debugging) |
 | `--worktree [name]` | Create a worktree with optional name |

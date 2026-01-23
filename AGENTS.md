@@ -62,6 +62,7 @@ docker-sandbox-crush/
 - `--shell` - Start an interactive shell instead of Crush CLI (for debugging)
 - `--quiet` - Suppress container setup messages in programmatic mode
 - `-p "prompt"` - Send prompt directly to Crush CLI (programmatic mode)
+- `--model "model"` - Specify AI model for programmatic mode (e.g., 'openai/gpt-4', 'claude-3.5')
 - `--no-host-config` - Skip mounting host Crush config directory
 - `--cred-scan` - Enable credential scanning before starting container
 - `--worktree [name]` - Create a worktree with optional name, then start Crush CLI in it (blank input uses worktree name as branch name)
@@ -509,7 +510,7 @@ No additional sanitization is performed beyond what git provides.
 
 **Docker execution**: Programmatic mode uses `docker exec -i` (no `-t`, not interactive). Crush CLI output is always visible to user.
 
-**Exit codes**: Crush CLI exit codes propagate to script exit for automation scripts.
+**Exit codes**: Crush CLI exit codes propagate to script exit for automation scripts. Error messages are explicitly captured and reported, even when Crush CLI fails due to invalid model names. When `--model` is specified and Crush CLI fails, the script provides troubleshooting hints about potential model validation issues.
 
 **Flag conflicts**: The `--shell` flag cannot be used with programmatic mode (`-p` flag or piped input). Error message: "Error: --shell flag cannot be used with -p or piped input".
 
@@ -535,6 +536,12 @@ No additional sanitization is performed beyond what git provides.
 
 Crush CLI output is always visible. Error messages always appear even in quiet mode. `--quiet` only applies to programmatic mode, not interactive mode.
 
+**Model selection**: `--model` flag allows specifying which AI model to use in programmatic mode:
+- Model flag works with both `-p` flag and piped input
+- Model value is passed directly to Crush CLI without validation
+- Common model formats: short names (`gpt-4`, `claude-3.5`), provider prefixes (`openai/gpt-4`, `anthropic/claude-3.5`), synthetic paths (`synthetic/hf:MiniMaxAI/MiniMax-M2.1`)
+- When not specified, Crush CLI uses its default model
+
 **Usage Examples**:
 ```bash
 # Simple prompt with -p flag
@@ -542,6 +549,15 @@ crush-sandbox run -p "Create a REST API with authentication"
 
 # Piped input
 echo "Add error handling to login function" | crush-sandbox run
+
+# With model selection (short name)
+crush-sandbox run -p "Create a REST API with authentication" --model "gpt-4"
+
+# With model selection (provider format)
+crush-sandbox run -p "Add error handling to login function" --model "openai/gpt-4"
+
+# With model selection (synthetic path)
+crush-sandbox run -p "Create a login form" --model "synthetic/hf:MiniMaxAI/MiniMax-M2.1"
 
 # Multi-line prompt with -p flag
 crush-sandbox run -p "Create a REST API with:
@@ -565,6 +581,9 @@ crush-sandbox run -p "Refactor code" --quiet
 # With worktree
 crush-sandbox run --worktree feature-auth -p "Add OAuth login"
 
+# With worktree and model
+crush-sandbox run --worktree feature-auth -p "Add OAuth login" --model "claude-3.5"
+
 # CI/CD pipeline
 #!/bin/bash
 crush-sandbox run -p "Add unit tests for user authentication" --quiet
@@ -573,9 +592,22 @@ git add .
 git commit -m "Add auth unit tests"
 git push origin main
 
+# CI/CD with model selection
+#!/bin/bash
+crush-sandbox run -p "Add unit tests for user authentication" --model "openai/gpt-4" --quiet
+npm test
+git add .
+git commit -m "Add auth unit tests"
+git push origin main
+
 # Generate multiple components
 for component in Button Input Modal; do
   crush-sandbox run -p "Create a React ${component} component" --quiet
+done
+
+# Generate multiple components with specific model
+for component in Button Input Modal; do
+  crush-sandbox run -p "Create a React ${component} component" --model "claude-3.5" --quiet
 done
 
 # Multi-line piped input
@@ -587,6 +619,9 @@ Create a login form with:
 - Email field
 - Password field
 EOF
+
+# Piped input with model
+echo -e "Fix login bug\nAdd validation" | crush-sandbox run --model "gpt-4"
 ```
 
 ## Important Gotchas
@@ -741,6 +776,7 @@ EOF
 | `prd-worktree-container-isolation.md` | ✅ Complete (all acceptance criteria checked) |
 | `prd-worktree-branch-handling.md` | ✅ Complete (all acceptance criteria checked) |
 | `prd-programmatic-mode.md` | ✅ Complete (all acceptance criteria checked) |
+| `prd-programmatic-model-selection.md` | ✅ Complete (all acceptance criteria checked) |
 
 ## Usage Examples
 
