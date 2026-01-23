@@ -155,7 +155,7 @@ jobs:
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ steps.current-version.outputs.version }}
+          branch: update/crush-v${{ steps.latest-version.outputs.version }}
           title: "Update Crush CLI to v${{ steps.latest-version.outputs.version }}"
           body: "## Update Crush CLI to v${{ steps.latest-version.outputs.version }}"
           labels: crush-update
