@@ -137,8 +137,18 @@ jobs:
           steps.check-existing-prs.outputs.existing_pr != 'true'
         run: |
           VERSION="${{ steps.latest-version.outputs.version }}"
-          sed -i "s/^CRUSH_VERSION=.*/CRUSH_VERSION=\"$VERSION\"/" docker-sandbox-crush
-          echo "Updated CRUSH_VERSION to $VERSION"
+
+          echo "Before:"
+          grep -nE 'CRUSH_VERSION' docker-sandbox-crush || true
+
+          # Replace CRUSH_VERSION line (handles optional "export " and leading whitespace)
+          sed -i -E 's/^([[:space:]]*(export[[:space:]]+)?)CRUSH_VERSION=.*/\1CRUSH_VERSION="'"$VERSION"'"/' docker-sandbox-crush
+
+          echo "After:"
+          grep -nE 'CRUSH_VERSION' docker-sandbox-crush || true
+
+          echo "Git diff:"
+          git diff -- docker-sandbox-crush || true
 
       - name: Commit changes
         if: |
