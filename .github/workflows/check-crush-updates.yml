@@ -147,6 +147,10 @@ jobs:
         run: |
           VERSION="${{ steps.latest-version.outputs.version }}"
           git add docker-sandbox-crush
+          if git diff --cached --quiet; then
+           echo "No changes to commit"
+           exit 0
+          fi
           git commit -m "fix: update Crush CLI to v$VERSION"
 
       - name: Push branch
@@ -154,9 +158,8 @@ jobs:
           steps.compare-versions.outputs.update_needed == 'true' &&
           steps.check-existing-prs.outputs.existing_pr != 'true'
         run: |
-          VERSION="${{ steps.latest-version.outputs.version }}"
-          BRANCH_NAME="update/crush-v$VERSION"
-          git push -u origin "$BRANCH_NAME"
+          BRANCH_NAME="${{ steps.branch.outputs.name }}"
+          git push --set-upstream origin "$BRANCH_NAME"
 
       - name: Create pull request
         if: |
@@ -165,7 +168,7 @@ jobs:
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          branch: update/crush-v${{ steps.latest-version.outputs.version }}
+          branch: ${{ steps.branch.outputs.name }}
           title: "Update Crush CLI to v${{ steps.latest-version.outputs.version }}"
           body: "## Update Crush CLI to v${{ steps.latest-version.outputs.version }}"
           labels: crush-update
