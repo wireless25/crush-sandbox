@@ -15,6 +15,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Get latest Crush version from npm
         id: latest-version
@@ -108,19 +110,27 @@ jobs:
           echo "PR for version v$LATEST already exists"
           echo "Skipping branch and PR creation"
 
-      - name: Create update branch
+      - name: Create or checkout update branch
+        id: branch
         if: |
           steps.compare-versions.outputs.update_needed == 'true' &&
           steps.check-existing-prs.outputs.existing_pr != 'true'
         run: |
           VERSION="${{ steps.latest-version.outputs.version }}"
           BRANCH_NAME="update/crush-v$VERSION"
+          echo "name=$BRANCH_NAME" >> $GITHUB_OUTPUT
 
-          echo "Creating branch: $BRANCH_NAME"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b "$BRANCH_NAME"
 
+          if git ls-remote --exit-code --heads origin "$BRANCH_NAME" >/dev/null 2>&1; then
+            echo "Branch exists on origin: $BRANCH_NAME"
+            git fetch origin "$BRANCH_NAME":"$BRANCH_NAME"
+            git checkout "$BRANCH_NAME"
+          else
+            echo "Branch does not exist on origin, creating: $BRANCH_NAME"
+            git checkout -b "$BRANCH_NAME"
+          fi
       - name: Update CRUSH_VERSION in script
         if: |
           steps.compare-versions.outputs.update_needed == 'true' &&
