@@ -2,7 +2,7 @@ name: Check Crush Updates
 
 on:
   schedule:
-    - cron: '0 */12 * * *'
+    - cron: "0 */12 * * *"
   workflow_dispatch:
 
 permissions:
@@ -28,7 +28,11 @@ jobs:
       - name: Parse current CRUSH_VERSION from script
         id: current-version
         run: |
-          CURRENT_VERSION=$(grep '^CRUSH_VERSION=' docker-sandbox-crush | cut -d'"' -f2)
+          CURRENT_VERSION=$(
+            grep -nE '^[[:space:]]*(export[[:space:]]+)?CRUSH_VERSION=' docker-sandbox-crush \
+              | head -n1 \
+              | sed -E 's/^[^=]+=//; s/^"//; s/"$//; s/^'\''//; s/'\''$//'
+          )
           echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
           echo "Current Crush version: $CURRENT_VERSION"
 
@@ -40,18 +44,15 @@ jobs:
 
           echo "Comparing: $CURRENT vs $LATEST"
 
-          # Parse version numbers
           IFS='.' read -r CURRENT_MAJOR CURRENT_MINOR CURRENT_PATCH <<< "$CURRENT"
           IFS='.' read -r LATEST_MAJOR LATEST_MINOR LATEST_PATCH <<< "$LATEST"
 
-          # Remove 'v' prefix if present
           CURRENT_MAJOR="${CURRENT_MAJOR#v}"
           LATEST_MAJOR="${LATEST_MAJOR#v}"
 
           echo "Current: $CURRENT_MAJOR.$CURRENT_MINOR.$CURRENT_PATCH"
           echo "Latest: $LATEST_MAJOR.$LATEST_MINOR.$LATEST_PATCH"
 
-          # Compare versions
           if [ "$CURRENT_MAJOR" -gt "$LATEST_MAJOR" ] 2>/dev/null; then
             echo "update_needed=false" >> $GITHUB_OUTPUT
             echo "Current version is newer (major)"
@@ -78,27 +79,37 @@ jobs:
           echo "Current version is up-to-date: v${{ steps.current-version.outputs.version }}"
           echo "No action needed"
 
-      - name: Check for existing PRs
+      - name: Compute branch name
+        id: branch
+        if: steps.compare-versions.outputs.update_needed == 'true'
+        run: |
+          VERSION="${{ steps.latest-version.outputs.version }}"
+          BRANCH_NAME="update/crush-v$VERSION"
+          echo "name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          echo "Branch name: $BRANCH_NAME"
+
+      - name: Check for existing PR (by head branch)
         id: check-existing-prs
         if: steps.compare-versions.outputs.update_needed == 'true'
         run: |
-          LATEST="${{ steps.latest-version.outputs.version }}"
-          echo "Checking for existing PRs with version $LATEST"
+          BRANCH_NAME="${{ steps.branch.outputs.name }}"
+          echo "Checking for existing PRs for head branch: $BRANCH_NAME"
 
-          # Search for existing PRs with crush-update label
-          EXISTING_PR=$(gh pr list \
-            --label crush-update \
-            --state all \
-            --json title,number \
-            --jq '.[] | select(.title == "Update Crush CLI to v'$LATEST'") | "\(.number) \(.title)"' || echo "")
+          EXISTING_PR_NUMBER=$(
+            gh pr list \
+              --head "$BRANCH_NAME" \
+              --state all \
+              --json number \
+              --jq '.[0].number' \
+              || true
+          )
 
-          if [ -n "$EXISTING_PR" ]; then
+          if [ -n "$EXISTING_PR_NUMBER" ]; then
             echo "existing_pr=true" >> $GITHUB_OUTPUT
-            echo "Existing PR found: $EXISTING_PR"
-            echo "Skipping PR creation"
+            echo "Existing PR found: #$EXISTING_PR_NUMBER"
           else
             echo "existing_pr=false" >> $GITHUB_OUTPUT
-            echo "No existing PR found for version $LATEST"
+            echo "No existing PR found for $BRANCH_NAME"
           fi
         env:
           GH_TOKEN: ${{ github.token }}
@@ -106,31 +117,28 @@ jobs:
       - name: Exit if PR already exists
         if: steps.check-existing-prs.outputs.existing_pr == 'true'
         run: |
-          LATEST="${{ steps.latest-version.outputs.version }}"
-          echo "PR for version v$LATEST already exists"
-          echo "Skipping branch and PR creation"
+          echo "PR already exists for branch ${{ steps.branch.outputs.name }}"
+          echo "Skipping branch update and PR creation"
 
-      - name: Create or checkout update branch
-        id: branch
+      - name: Checkout or create update branch
         if: |
           steps.compare-versions.outputs.update_needed == 'true' &&
           steps.check-existing-prs.outputs.existing_pr != 'true'
         run: |
-          VERSION="${{ steps.latest-version.outputs.version }}"
-          BRANCH_NAME="update/crush-v$VERSION"
-          echo "name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          BRANCH_NAME="${{ steps.branch.outputs.name }}"
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           if git ls-remote --exit-code --heads origin "$BRANCH_NAME" >/dev/null 2>&1; then
             echo "Branch exists on origin: $BRANCH_NAME"
-            git fetch origin "$BRANCH_NAME":"$BRANCH_NAME"
-            git checkout "$BRANCH_NAME"
+            git fetch origin "$BRANCH_NAME"
+            git checkout -B "$BRANCH_NAME" "origin/$BRANCH_NAME"
           else
             echo "Branch does not exist on origin, creating: $BRANCH_NAME"
             git checkout -b "$BRANCH_NAME"
           fi
+
       - name: Update CRUSH_VERSION in script
         if: |
           steps.compare-versions.outputs.update_needed == 'true' &&
@@ -141,13 +149,12 @@ jobs:
           echo "Before:"
           grep -nE 'CRUSH_VERSION' docker-sandbox-crush || true
 
-          # Replace CRUSH_VERSION line (handles optional "export " and leading whitespace)
           sed -i -E 's/^([[:space:]]*(export[[:space:]]+)?)CRUSH_VERSION=.*/\1CRUSH_VERSION="'"$VERSION"'"/' docker-sandbox-crush
 
           echo "After:"
           grep -nE 'CRUSH_VERSION' docker-sandbox-crush || true
 
-          echo "Git diff:"
+          echo "Diff:"
           git diff -- docker-sandbox-crush || true
 
       - name: Commit changes
@@ -156,11 +163,14 @@ jobs:
           steps.check-existing-prs.outputs.existing_pr != 'true'
         run: |
           VERSION="${{ steps.latest-version.outputs.version }}"
+
           git add docker-sandbox-crush
+
           if git diff --cached --quiet; then
-           echo "No changes to commit"
-           exit 0
+            echo "No changes to commit"
+            exit 0
           fi
+
           git commit -m "fix: update Crush CLI to v$VERSION"
 
       - name: Push branch
@@ -175,12 +185,15 @@ jobs:
         if: |
           steps.compare-versions.outputs.update_needed == 'true' &&
           steps.check-existing-prs.outputs.existing_pr != 'true'
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ steps.branch.outputs.name }}
-          title: "Update Crush CLI to v${{ steps.latest-version.outputs.version }}"
-          body: "## Update Crush CLI to v${{ steps.latest-version.outputs.version }}"
-          labels: crush-update
-          commit-message: "fix: update Crush CLI to v${{ steps.latest-version.outputs.version }}"
-          base: main
+        run: |
+          VERSION="${{ steps.latest-version.outputs.version }}"
+          BRANCH_NAME="${{ steps.branch.outputs.name }}"
+
+          gh pr create \
+            --base main \
+            --head "$BRANCH_NAME" \
+            --title "Update Crush CLI to v$VERSION" \
+            --body "## Update Crush CLI to v$VERSION" \
+            --label "crush-update"
+        env:
+          GH_TOKEN: ${{ github.token }}
