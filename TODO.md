@@ -1,0 +1,22 @@
+- switch to zsh
+- install oh-my-zsh
+- install powerlevel10k theme
+- beautify output logs
+- pass additional docker args
+- pass crush args
+- programmatic use with stdin or -p flag
+- setting additional env vars
+
+- does remove-worktree also remove the container?
+- should clean command also remove worktrees?
+
+- fix worktree container naming so all valid worktree names also work, replace invalid chars in container name
+- remove of worktree should also remove container
+- mount $HOME/.config/crush/crush.json also into the container
+- bash history persistence
+- session persistence
+- pnpm version via corepack or env var, maybe also node? or better via image?
+- sync .env files in worktrees (find . -name ".env" -print0 | xargs -0 -I {} rsync -R {} ./.worktrees/fix_location_restore/)
+- use the correct folders in the container for config
+- add yolo flag to directly start in yolo mode
+- skip branch creation if exists in upgrade ci

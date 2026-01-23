@@ -1,6 +1,6 @@
 {
     "name": "crush-sandbox",
-    "version": "0.8.0",
+    "version": "0.9.0",
     "description": "Docker sandbox for the Crush CLI with Git worktree support",
     "license": "MIT",
     "bin": {
