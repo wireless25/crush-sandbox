@@ -66,6 +66,8 @@ This will:
 - **Git worktree support** - Work on multiple branches simultaneously without git conflicts
 - **Per-worktree container isolation**: Each worktree (main + each worktree) gets its own container for crash isolation
 - **Shared cache volumes**: All worktrees in same repository share a cache volume for fast installs
+- **Configurable resource limits**: Tune memory, CPU, and process limits via environment variables
+- **Parallel container support**: Run 3-5 containers safely on 32GB RAM systems
 - **Workspace path mounting**: Your workspace is mounted at same absolute path inside container, makes debugging easier
 - **Persistent caches**: npm and pnpm caches persist per repository for faster subsequent runs
 - **Automatic Crush CLI installation**: Crush CLI is installed automatically on first use
@@ -250,6 +252,70 @@ You can control configuration behavior with these flags:
 crush-sandbox run --no-host-config
 # Or use alias:
 crushbox run --no-host-config
+```
+
+### Resource Configuration
+
+Each container is configured with resource limits to ensure safe autonomous execution. These limits are designed for **3-5 containers in parallel on 32GB RAM systems**.
+
+**Default Resource Limits:**
+- **Memory**: 4GB per container (with 4GB swap for spikes)
+- **CPU**: 2 cores per container
+- **Process limit**: 1024 processes (prevents fork bombs but enables build processes)
+
+**Why these limits?**
+- Prevents resource exhaustion attacks while maintaining usability
+- Allows builds (Vite, Webpack, etc.) to run successfully
+- Enables parallel development across multiple worktrees
+- Protects your host system from runaway processes
+
+**Environment Variable Overrides**
+
+You can customize resource limits for your hardware or workload:
+
+```bash
+# Increase for heavy workloads on 32GB RAM (2-3 containers max)
+export DOCKER_SANDBOX_MEMORY=8g
+export DOCKER_SANDBOX_CPUS=4.0
+export DOCKER_SANDBOX_NPROC=2000
+
+# Use for a single session
+DOCKER_SANDBOX_MEMORY=8g DOCKER_SANDBOX_CPUS=4.0 crush-sandbox run
+```
+
+**Recommended Configurations by RAM:**
+
+| System RAM | Memory/CPU per container | Safe parallel containers | Environment vars |
+|------------|------------------------|------------------------|------------------|
+| 16GB | 2GB / 1.5 CPUs | 2 containers | `DOCKER_SANDBOX_MEMORY=2g DOCKER_SANDBOX_CPUS=1.5` |
+| 32GB | 4GB / 2 CPUs | 3-5 containers | (defaults, no override needed) |
+| 64GB+ | 8GB / 4 CPUs | 5-8 containers | `DOCKER_SANDBOX_MEMORY=8g DOCKER_SANDBOX_CPUS=4.0` |
+
+**Parallel Container Safety:**
+
+When running multiple worktree containers in parallel:
+- Total memory used = (containers × memory_limit)
+- Swap provides headroom during builds (one container can spike to 2× limit)
+- With defaults (4GB each), 5 containers = 20GB RAM + occasional swap usage
+- Build processes are the main bottleneck - they rarely run in parallel across multiple worktrees
+
+**Example: Parallel Worktree Development**
+
+```bash
+# Terminal 1: Main workspace
+cd ~/projects/my-app
+crush-sandbox run
+
+# Terminal 2: Worktree 1
+cd ~/projects/my-app
+crush-sandbox run --worktree feature-auth
+
+# Terminal 3: Worktree 2
+cd ~/projects/my-app
+crush-sandbox run --worktree feature-ui
+
+# All three containers run independently with 4GB RAM each
+# Total: ~12GB used, leaves 20GB for system + Docker
 ```
 
 ### Configuration Directory Structure Example
@@ -535,9 +601,11 @@ The Crush agent cannot:
 The tool implements these security controls:
 
 1. **Resource limits** - Prevents resource exhaustion attacks:
-   - Memory limited to 4GB
-   - CPU limited to 2 cores
-   - Process count limited to 100 PIDs
+   - Memory limited to 4GB per container (configurable via `DOCKER_SANDBOX_MEMORY`)
+   - CPU limited to 2 cores per container (configurable via `DOCKER_SANDBOX_CPUS`)
+   - Process count limited to 1000 PIDs (configurable via `DOCKER_SANDBOX_NPROC`)
+   - Designed for 3-5 containers in parallel on 32GB RAM systems
+   - Swap allows temporary memory spikes during builds
 
 2. **Non-root user** - Limits attack surface:
    - Container runs as your UID/GID
@@ -573,7 +641,7 @@ This means:
 
 ### Container Lifecycle
 
-1. **Create**: Container is created from `node:18-alpine` base image
+1. **Create**: Container is created from `node:22-bookworm` base image
 2. **Configure**: Workspace and cache volumes are mounted, environment variables are set
 3. **Start**: Container is started
 4. **Use**: Crush CLI or shell runs inside the container
@@ -865,6 +933,68 @@ docker info
 ```bash
 git config --global user.name "Your Name"
 git config --global user.email "your.email@example.com"
+```
+
+### Build fails with "not enough threads" or "too many open files"
+
+**Problem**: Vite, Webpack, or other build tools fail due to resource limits.
+
+**Solution**: Increase the process limit via environment variable:
+```bash
+export DOCKER_SANDBOX_NPROC=2000
+crush-sandbox run
+```
+
+Or for a one-time fix:
+```bash
+DOCKER_SANDBOX_NPROC=2000 crush-sandbox run
+```
+
+**Background**: The default limit (1000 processes) protects against fork bombs but allows most builds. Some aggressive build tools (Vite with many plugins, parallel TypeScript compilation) may need higher limits. Increase to 1500-2000 for complex projects.
+
+### Build fails with "memory limit exceeded" or OOM
+
+**Problem**: Large build processes run out of memory.
+
+**Solution**: Increase memory limit via environment variable:
+```bash
+# For 16GB RAM system
+export DOCKER_SANDBOX_MEMORY=6g
+
+# For 32GB RAM system
+export DOCKER_SANDBOX_MEMORY=8g
+
+crush-sandbox run
+```
+
+Swap is automatically set to same value as memory, allowing temporary spikes during builds.
+
+### System becomes slow with multiple containers
+
+**Problem**: Running 3-5 worktree containers slows down your Mac.
+
+**Solution**: You've exceeded safe parallel container limits for your hardware:
+
+**For 16GB RAM:**
+```bash
+# Limit to 2 containers with reduced resources
+export DOCKER_SANDBOX_MEMORY=2g
+export DOCKER_SANDBOX_CPUS=1.5
+export DOCKER_SANDBOX_NPROC=800
+```
+
+**For 32GB RAM (defaults are fine, but ensure you're not building in parallel):**
+- Builds in multiple worktrees simultaneously can overload the system
+- Stop idle containers: `crush-sandbox clean` (choose option 1)
+- Only build in active worktree, use others for file editing
+
+**Check current resource usage:**
+```bash
+# See all containers and their status
+crush-sandbox list-containers
+
+# See Docker stats
+docker stats
 ```
 
 ### Crush CLI not working in container

@@ -71,7 +71,16 @@ docker-sandbox-crush/
 ### Environment Variables
 
 - `DOCKER_SANDBOX_IMAGE` - Override the Docker image (default: `node:22-alpine`)
-- Example: `DOCKER_SANDBOX_IMAGE=node:20-alpine ./docker-sandbox-crush run` or `DOCKER_SANDBOX_IMAGE=node:20-alpine crush-sandbox run`
+  - Example: `DOCKER_SANDBOX_IMAGE=node:20-alpine ./docker-sandbox-crush run`
+- `DOCKER_SANDBOX_MEMORY` - Override memory limit per container (default: `4g`)
+  - Example: `DOCKER_SANDBOX_MEMORY=8g crush-sandbox run`
+- `DOCKER_SANDBOX_CPUS` - Override CPU limit per container (default: `2.0`)
+  - Example: `DOCKER_SANDBOX_CPUS=4.0 crush-sandbox run`
+- `DOCKER_SANDBOX_NPROC` - Override process limit per container (default: `1000`)
+  - Example: `DOCKER_SANDBOX_NPROC=2000 crush-sandbox run`
+- **Resource allocation**: Defaults configured for 3-5 containers in parallel on 32GB RAM systems
+  - For 16GB RAM: Use `DOCKER_SANDBOX_MEMORY=2g` and `DOCKER_SANDBOX_CPUS=1.5`
+  - For heavier workloads: Increase limits individually, but keep parallel containers in mind
 
 ## Essential Testing Commands
 
@@ -746,10 +755,12 @@ echo -e "Fix login bug\nAdd validation" | crush-sandbox run --model "gpt-4"
 ### Container Security Configuration
 - **User**: Non-root (UID 1000:GID 1000)
 - **Resource limits**:
-  - Memory: 4GB (`--memory=4g`)
-  - Swap: 4GB (no swapping allowed, `--memory-swap=4g`)
-  - CPU: 2 cores (`--cpus=2.0`)
-  - Processes: 100 PIDs (`--ulimit nproc=100`)
+  - Memory: 4GB per container (`--memory=4g`, configurable via `DOCKER_SANDBOX_MEMORY`)
+  - Swap: 4GB per container (`--memory-swap=4g`, same as memory, allows temporary spikes)
+  - CPU: 2 cores per container (`--cpus=2.0`, configurable via `DOCKER_SANDBOX_CPUS`)
+  - Processes: 1000 PIDs per container (`--ulimit nproc=1000`, configurable via `DOCKER_SANDBOX_NPROC`)
+- **Designed for**: 3-5 containers in parallel on 32GB RAM systems
+- **All limits can be overridden** via environment variables for different hardware or workloads
 - **Capabilities**:
   - Drop all capabilities by default (`--cap-drop ALL`)
   - Add back CHOWN (needed for npm cache ownership)
