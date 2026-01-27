@@ -75,8 +75,19 @@ print_usage() {
     echo "  --dry-run               Preview uninstall actions without executing"
     echo "  --worktree [name]       Create a worktree with optional name (defaults to worktree name as branch name)"
     echo "  --branch-name [name]    Specify branch name for worktree (skips branch prompt, requires --worktree)"
-    echo "  --model "model"          Specify AI model for programmatic mode (e.g., 'openai/gpt-4', 'claude-3.5')"
+    echo "  --model [model]         Specify AI model for programmatic mode (e.g., 'openai/gpt-4', 'claude-3.5')"
     echo "  -p \"prompt\"           Send prompt directly to Crush CLI (programmatic mode)"
+    echo "  --docker-args \"args\"  Pass additional Docker arguments (advanced, use with caution)"
+    echo ""
+    echo "    Examples:"
+    echo "      --docker-args \"--network host\""
+    echo "      --docker-args \"-v /path/to/data:/data\""
+    echo "      --docker-args \"--cap-add NET_ADMIN\""
+    echo ""
+    echo "    Security Note:"
+    echo "      Docker arguments are passed directly to Docker CLI without validation."
+    echo "      You are responsible for ensuring arguments are secure and appropriate."
+    echo "      This can override existing security controls (e.g., capability dropping)."
 }
 
 validate_docker() {
@@ -411,6 +422,11 @@ create_container() {
     local cache_volume_name="$5"
     local host_config_path="$6"
     local host_session_data_path="$7"
+    # Docker args are inserted into the docker_args array before the image name
+    # This allows users to pass arbitrary Docker arguments for advanced customization
+    # Args are stored as a base64-encoded label for persistence across container restarts
+    local extra_docker_args="$8"
+    local docker_args_source="$9"
 
     local base_image="${DOCKER_IMAGE}"
     local docker_args=(
@@ -448,6 +464,28 @@ create_container() {
     fi
     if [ -n "$git_email" ]; then
         docker_args+=("-e" "GIT_USER_EMAIL=${git_email}")
+    fi
+
+    # Add extra Docker args if provided (inserted before security flags)
+    if [ -n "$extra_docker_args" ]; then
+        # Base64-encode the args and store as label for persistence
+        local encoded_args
+        encoded_args=$(echo -n "$extra_docker_args" | base64)
+        docker_args+=("--label" "crush-sandbox.extra-docker-args=${encoded_args}")
+
+        # Store source metadata (env var, CLI, or both)
+        if [ -n "$docker_args_source" ]; then
+            docker_args+=("--label" "crush-sandbox.extra-docker-args-source=${docker_args_source}")
+        fi
+
+        # Parse and add extra Docker args to docker_args array
+        # Use eval to split args properly (spaces, quotes, etc.)
+        # Security: Users are responsible for Docker argument validation
+        eval "local extra_args_array=($extra_docker_args)"
+        for arg in "${extra_args_array[@]}"; do
+            docker_args+=("$arg")
+        done
+        echo "Using custom Docker args: $extra_docker_args (source: ${docker_args_source})"
     fi
 
     docker_args+=("$base_image")
@@ -790,9 +828,96 @@ run_command() {
     # Check if container exists, create if not
     if container_exists "$container_name"; then
         echo "Reusing existing container"
+        # Read stored Docker args from container label for persistence
+        local stored_docker_args
+        stored_docker_args=$(docker inspect --format '{{index .Config.Labels "crush-sandbox.extra-docker-args"}}' "$container_name" 2>/dev/null || echo "")
+        if [ -n "$stored_docker_args" ]; then
+            # Decode base64-encoded Docker args
+            stored_docker_args=$(echo "$stored_docker_args" | base64 -d 2>/dev/null || echo "")
+            if [ -n "$stored_docker_args" ]; then
+                echo "Using stored Docker args: $stored_docker_args"
+            fi
+        fi
+
+        # Validate that provided Docker args match stored args
+        # Changing Docker args requires container removal (via `clean` command)
+        local requested_docker_args=""
+        if [ -n "$DOCKER_ARGS_ENV" ]; then
+            requested_docker_args="$DOCKER_ARGS_ENV"
+        fi
+        if [ -n "$DOCKER_ARGS" ]; then
+            if [ -n "$requested_docker_args" ]; then
+                requested_docker_args="$requested_docker_args $DOCKER_ARGS"
+            else
+                requested_docker_args="$DOCKER_ARGS"
+            fi
+        fi
+
+        if [ -n "$requested_docker_args" ] && [ "$requested_docker_args" != "$stored_docker_args" ]; then
+            echo "Docker args mismatch detected"
+            echo "  Stored args:  $stored_docker_args"
+            echo "  Requested args: $requested_docker_args"
+
+            # Check if we're in TTY mode (interactive terminal)
+            if [ -t 0 ]; then
+                echo ""
+                echo "Options:"
+                echo "  1. Proceed with stored args ($stored_docker_args)"
+                echo "  2. Clean container and recreate with new args ($requested_docker_args)"
+                echo ""
+
+                # Default to option 1 (use stored args)
+                read -p "Enter choice [1]: " choice
+                choice="${choice:-1}"
+
+                case "$choice" in
+                    1)
+                        echo "Proceeding with stored Docker args: $stored_docker_args"
+                        ;;
+                    2)
+                        echo "Cleaning container..."
+                        docker stop "$container_name" > /dev/null 2>&1 || true
+                        docker rm "$container_name" > /dev/null 2>&1
+                        echo "Creating new container with args: $requested_docker_args"
+
+                        # Merge args for creation
+                        local merged_docker_args="$requested_docker_args"
+                        local docker_args_source="cli"
+                        if [ -n "$DOCKER_ARGS_ENV" ] && [ -n "$DOCKER_ARGS" ]; then
+                            docker_args_source="both"
+                        fi
+
+                        create_container "$workspace" "$container_name" "$git_name" "$git_email" "$cache_volume_name" "$host_config_path" "$host_session_data_path" "$merged_docker_args" "$docker_args_source"
+                        ;;
+                    *)
+                        echo "Invalid choice. Aborted."
+                        exit 1
+                        ;;
+                esac
+            else
+                # Programmatic mode: silent success, use stored args
+                echo "Using stored Docker args: $stored_docker_args"
+            fi
+        fi
     else
         echo "Creating new container"
-        create_container "$workspace" "$container_name" "$git_name" "$git_email" "$cache_volume_name" "$host_config_path" "$host_session_data_path"
+        # Merge environment variable and CLI flag Docker args (env var + CLI flag)
+        local merged_docker_args=""
+        local docker_args_source="none"
+        if [ -n "$DOCKER_ARGS_ENV" ]; then
+            merged_docker_args="$DOCKER_ARGS_ENV"
+            docker_args_source="env"
+        fi
+        if [ -n "$DOCKER_ARGS" ]; then
+            if [ -n "$merged_docker_args" ]; then
+                merged_docker_args="$merged_docker_args $DOCKER_ARGS"
+                docker_args_source="both"
+            else
+                merged_docker_args="$DOCKER_ARGS"
+                docker_args_source="cli"
+            fi
+        fi
+        create_container "$workspace" "$container_name" "$git_name" "$git_email" "$cache_volume_name" "$host_config_path" "$host_session_data_path" "$merged_docker_args" "$docker_args_source"
     fi
 
     # Run the container
@@ -1799,6 +1924,13 @@ REMOVE_WORKTREE=""
 PROGRAMATIC_MODE="false"
 PROMPT=""
 MODEL=""
+DOCKER_ARGS=""
+DOCKER_ARGS_ENV=""
+
+# Read CRUSH_SANDBOX_EXTRA_DOCKER_ARGS environment variable
+if [ -n "$CRUSH_SANDBOX_EXTRA_DOCKER_ARGS" ]; then
+    DOCKER_ARGS_ENV="$CRUSH_SANDBOX_EXTRA_DOCKER_ARGS"
+fi
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -1859,6 +1991,14 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             fi
             MODEL="$2"
+            shift 2
+            ;;
+        --docker-args)
+            if [[ -z "$2" ]]; then
+                echo "Error: --docker-args requires a value" >&2
+                exit 1
+            fi
+            DOCKER_ARGS="$2"
             shift 2
             ;;
         --list-worktrees)

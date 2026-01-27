@@ -190,6 +190,7 @@ Creates a new Docker container with:
 - **Resource limits** for DoS prevention (4GB memory, 2 CPUs, 100 PIDs)
 - **Non-root user** (UID 1000) for attack surface reduction
 - **Capability dropping** (all dropped, only CHOWN and DAC_OVERRIDE added back)
+- **Custom Docker args** via `--docker-args` flag (stored as base64-encoded label for persistence)
 
 ### `validate_workspace_path()`
 Validates workspace path for security (prevents command injection).
@@ -1101,3 +1102,25 @@ From `prd-distribution-and-docs.md`:
 - Programmatic mode is enabled when `-p` flag is used or when stdin has piped input
 - Error message: "Error: --shell flag cannot be used with -p or piped input"
 - Solution: Remove `--shell` flag when using `-p` or piped input, or remove `-p`/piped input when using `--shell`
+
+## Codebase Patterns
+
+### Docker Label Storage Pattern
+- Use base64 encoding to store complex values in Docker labels
+- Pattern: `--label "key=$(echo -n "$value" | base64)"`
+- Decode with: `echo "$label_value" | base64 -d`
+- Use case: Storing metadata with spaces, special characters, or multi-word values
+- Example: Container metadata persistence (e.g., `crush-sandbox.extra-docker-args`)
+
+### Argument Parsing Pattern for Values Starting with Dash
+- Standard pattern: `if [[ -z "$2" || "$2" =~ ^- ]]` (checks for empty or starts with dash)
+- Exception case: When flag accepts values that can start with `-` or `--` (e.g., Docker arguments)
+- Solution for exception: `if [[ -z "$2" ]]` (only check for empty, not dash prefix)
+- Use case: Flags where value is a raw string passed to another command (not a simple scalar)
+
+### eval Pattern for Parsing Arguments
+- Use `eval` to parse space-separated arguments into bash arrays while preserving quotes
+- Pattern: `eval "array_name=($string_value)"`
+- Use case: When you need to split a string into individual arguments with proper quote handling
+- Example: `eval "extra_args_array=($extra_docker_args)"` then iterate with `"${extra_args_array[@]}"`
+- Security note: Users are responsible for validating arguments before eval
