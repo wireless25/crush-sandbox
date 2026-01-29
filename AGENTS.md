@@ -182,6 +182,7 @@ Creates a named Docker volume for caching if it doesn't already exist.
 Creates a new Docker container with:
 - Base image: `node:22-alpine` (configurable via `DOCKER_SANDBOX_IMAGE`)
 - Workspace mounted at same absolute path (read/write)
+- **Repository root mounted at its absolute path (read/write) - enables git worktrees**
 - Cache volume mounted at `/workspace-cache`
 - Git config passed as environment variables (`GIT_USER_NAME`, `GIT_USER_EMAIL`)
 - npm cache configured to `/workspace-cache/npm`
@@ -638,9 +639,11 @@ echo -e "Fix login bug\nAdd validation" | crush-sandbox run --model "gpt-4"
 
 ### Workspace Path Mapping
 - Workspace is mounted at **same absolute path** in container
+- **Repository root is also mounted at its absolute path** (enables git operations in worktrees)
 - This works seamlessly on macOS Docker Desktop
-- Container's working directory is set to workspace path
+- Container's working directory is set to workspace path (worktree or main)
 - Relative paths work identically inside and outside container
+- **For worktrees**: The workspace is the worktree directory, but repository root is also mounted to enable git operations
 
 ### Container Lifecycle
 1. `docker create` creates stopped container
@@ -860,6 +863,44 @@ yes "" | ./docker-sandbox-crush run --worktree auto-branch
 
 # CI/CD example: create worktree from environment variable
 ./docker-sandbox-crush run --worktree ci-"$BUILD_ID" --branch-name "$CI_BRANCH"
+```
+
+### Parallel Worktree Usage
+```bash
+# Terminal 1: Start Crush CLI in main workspace
+cd /projects/my-app
+./docker-sandbox-crush run
+
+# Terminal 2: Create and run Crush CLI in worktree 1
+cd /projects/my-app
+./docker-sandbox-crush run --worktree feature-auth
+
+# Terminal 3: Create and run Crush CLI in worktree 2
+cd /projects/my-app
+./docker-sandbox-crush run --worktree feature-ui
+
+# Each worktree has its own isolated container
+# Stopping one doesn't affect the others
+# All worktrees share the same npm/pnpm cache
+```
+
+### Testing Git Operations in Worktrees
+```bash
+# Create a worktree
+./docker-sandbox-crush run --worktree test-worktree
+
+# Start an interactive shell to test git operations
+./docker-sandbox-crush run --worktree test-worktree --shell
+
+# Inside the container, git operations work correctly:
+git status                          # Shows worktree branch status
+git log                              # Shows commit history for worktree branch
+git branch --show-current              # Shows current branch name
+git add . && git commit -m "test"  # Commits work to worktree branch
+
+# Repository root is accessible from container:
+ls -la /path/to/repo               # Can access entire repository
+ls -la /path/to/repo/.crush        # Can access .crush folder from root
 ```
 
 ### Programmatic Mode Usage

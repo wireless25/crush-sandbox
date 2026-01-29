@@ -420,19 +420,21 @@ create_container() {
     local git_name="$3"
     local git_email="$4"
     local cache_volume_name="$5"
-    local host_config_path="$6"
-    local host_session_data_path="$7"
+    local repo_root="$6"
+    local host_config_path="$7"
+    local host_session_data_path="$8"
     # Docker args are inserted into the docker_args array before the image name
     # This allows users to pass arbitrary Docker arguments for advanced customization
     # Args are stored as a base64-encoded label for persistence across container restarts
-    local extra_docker_args="$8"
-    local docker_args_source="$9"
+    local extra_docker_args="$9"
+    local docker_args_source="${10}"
 
     local base_image="${DOCKER_IMAGE}"
     local docker_args=(
         "--name" "$container_name"
         "-v" "${workspace}:${workspace}"
         "-v" "${cache_volume_name}:/workspace-cache"
+        "-v" "${repo_root}:${repo_root}"
         "-w" "$workspace"
         "--user" "1000:1000"
         "--memory=${DOCKER_SANDBOX_MEMORY}"
@@ -887,7 +889,7 @@ run_command() {
                             docker_args_source="both"
                         fi
 
-                        create_container "$workspace" "$container_name" "$git_name" "$git_email" "$cache_volume_name" "$host_config_path" "$host_session_data_path" "$merged_docker_args" "$docker_args_source"
+                        create_container "$workspace" "$container_name" "$git_name" "$git_email" "$cache_volume_name" "$root_workspace" "$host_config_path" "$host_session_data_path" "$merged_docker_args" "$docker_args_source"
                         ;;
                     *)
                         echo "Invalid choice. Aborted."
@@ -917,7 +919,7 @@ run_command() {
                 docker_args_source="cli"
             fi
         fi
-        create_container "$workspace" "$container_name" "$git_name" "$git_email" "$cache_volume_name" "$host_config_path" "$host_session_data_path" "$merged_docker_args" "$docker_args_source"
+        create_container "$workspace" "$container_name" "$git_name" "$git_email" "$cache_volume_name" "$root_workspace" "$host_config_path" "$host_session_data_path" "$merged_docker_args" "$docker_args_source"
     fi
 
     # Run the container
